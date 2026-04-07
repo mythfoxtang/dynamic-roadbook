@@ -8,6 +8,7 @@ import { STOP_CATEGORY_META, STOP_CATEGORY_OPTIONS, inferStopCategory, inferStop
 const ROUTE_CACHE_KEY = "dynamic-roadbook-route-cache-v6";
 const ROUTE_OVERRIDE_KEY = "dynamic-roadbook-route-overrides-v3";
 const CUSTOM_PLACE_LIBRARY_KEY = "dynamic-roadbook-custom-places-v2";
+const CURRENT_LOCATION_KEY = "dynamic-roadbook-current-location-v1";
 
 function loadJson(key) {
   if (typeof window === "undefined") return {};
@@ -24,6 +25,24 @@ function persistJson(key, value) {
   try {
     window.localStorage.setItem(key, JSON.stringify(value));
   } catch {}
+}
+
+function formatLocationTimestamp(value) {
+  if (!value) return "--";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "--";
+  return new Intl.DateTimeFormat("zh-CN", {
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false
+  }).format(date);
+}
+
+function formatCoord(value, digits = 5) {
+  if (typeof value !== "number" || Number.isNaN(value)) return "--";
+  return value.toFixed(digits);
 }
 
 function normalizeStop(stop) {
@@ -180,7 +199,7 @@ function FlightPanel({ activeDay }) {
   );
 }
 
-function OfflineMap({ activeDay, stops, routeInfo }) {
+function OfflineMap({ activeDay, stops, routeInfo, currentLocation }) {
   const stagePoints = useMemo(() => getSegmentPoints(stops), [stops]);
 
   if (activeDay.transport === "flight") return <FlightPanel activeDay={activeDay} />;
@@ -197,6 +216,13 @@ function OfflineMap({ activeDay, stops, routeInfo }) {
           </div>
         ))}
       </div>
+      {currentLocation ? (
+        <div className="mt-4 rounded-2xl border border-emerald-300/20 bg-emerald-300/10 px-4 py-3 text-sm text-white/78">
+          <div className="text-[11px] uppercase tracking-[0.18em] text-white/50">当前位置记录</div>
+          <div className="mt-2 text-white">{`${formatCoord(currentLocation.lat, 4)}, ${formatCoord(currentLocation.lng, 4)}`}</div>
+          <div className="mt-1 text-xs text-white/55">{`记录于 ${formatLocationTimestamp(currentLocation.recordedAt)}`}</div>
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -670,7 +696,7 @@ function RouteEditor({ activeDay, currentStops, setCurrentStops, hasOverride, on
   );
 }
 
-function LiveAmap({ activeDay, days, stops, onRouteInfoChange, applyNonce, onPlanningChange }) {
+function LiveAmap({ activeDay, days, stops, onRouteInfoChange, applyNonce, onPlanningChange, currentLocation }) {
   const mapRef = useRef(null);
   const mapInstanceRef = useRef(null);
   const amapRef = useRef(null);
@@ -678,6 +704,7 @@ function LiveAmap({ activeDay, days, stops, onRouteInfoChange, applyNonce, onPla
   const preloadDrivingRef = useRef(null);
   const routeOverlayRef = useRef(null);
   const markerRefs = useRef([]);
+  const locationMarkerRef = useRef(null);
   const preloadStartedRef = useRef(false);
   const planRequestIdRef = useRef(0);
   const cacheRef = useRef({});
@@ -707,6 +734,12 @@ function LiveAmap({ activeDay, days, stops, onRouteInfoChange, applyNonce, onPla
     if (!routeOverlayRef.current) return;
     routeOverlayRef.current.setMap(null);
     routeOverlayRef.current = null;
+  }
+
+  function clearLocationMarker() {
+    if (!locationMarkerRef.current) return;
+    locationMarkerRef.current.setMap(null);
+    locationMarkerRef.current = null;
   }
 
   function publishRoute(dayId, route) {
@@ -751,6 +784,31 @@ function LiveAmap({ activeDay, days, stops, onRouteInfoChange, applyNonce, onPla
 
     routeOverlayRef.current.setMap(map);
     map.setFitView([...markers, routeOverlayRef.current], false, [64, 80, 64, 80]);
+  }
+
+  function drawCurrentLocation(location) {
+    const map = mapInstanceRef.current;
+    const AMap = amapRef.current;
+    if (!map || !AMap) return;
+
+    clearLocationMarker();
+    if (!location) return;
+
+    const marker = new AMap.Marker({
+      position: [location.lng, location.lat],
+      anchor: "bottom-center",
+      content: `
+        <div style="display:flex;align-items:center;gap:8px;transform:translate(-50%,-100%);">
+          <div style="display:flex;height:18px;width:18px;align-items:center;justify-content:center;border-radius:999px;background:#34d399;box-shadow:0 0 0 6px rgba(52,211,153,.16);"></div>
+          <div style="border:1px solid rgba(52,211,153,.24);border-radius:999px;background:rgba(12,24,28,.88);padding:6px 10px;color:#d1fae5;font-size:12px;line-height:1.1;white-space:nowrap;">
+            当前位置
+          </div>
+        </div>
+      `
+    });
+
+    marker.setMap(map);
+    locationMarkerRef.current = marker;
   }
 
   function applyCachedRoute(dayId, nextCacheKey, points) {
@@ -911,6 +969,7 @@ function LiveAmap({ activeDay, days, stops, onRouteInfoChange, applyNonce, onPla
           if (!cacheRef.current[cacheKey]) await planCurrentDay(true);
         }
 
+        drawCurrentLocation(currentLocation);
         await preloadRoutes();
       })
       .catch((error) => {
@@ -921,6 +980,7 @@ function LiveAmap({ activeDay, days, stops, onRouteInfoChange, applyNonce, onPla
       disposed = true;
       clearRouteOverlay();
       clearMarkers();
+      clearLocationMarker();
       activeDrivingRef.current = null;
       preloadDrivingRef.current = null;
       mapInstanceRef.current?.destroy?.();
@@ -946,7 +1006,12 @@ function LiveAmap({ activeDay, days, stops, onRouteInfoChange, applyNonce, onPla
     planCurrentDay(true);
   }, [applyNonce]);
 
-  if (!amapKey || loadError) return <OfflineMap activeDay={activeDay} stops={stops} routeInfo={routeInfo} />;
+  useEffect(() => {
+    if (!mapInstanceRef.current) return;
+    drawCurrentLocation(currentLocation);
+  }, [currentLocation]);
+
+  if (!amapKey || loadError) return <OfflineMap activeDay={activeDay} stops={stops} routeInfo={routeInfo} currentLocation={currentLocation} />;
   if (activeDay.transport === "flight") return <FlightPanel activeDay={activeDay} />;
 
   return (
@@ -988,15 +1053,26 @@ function LiveAmap({ activeDay, days, stops, onRouteInfoChange, applyNonce, onPla
   );
 }
 
-export default function MapPanel({ activeDay, days, onRouteInfoChange, onStopsChange }) {
+export default function MapPanel({ activeDay, days, onRouteInfoChange, onStopsChange, onLocationCapture }) {
   const [currentStops, setCurrentStops] = useState(activeDay.stops);
   const [applyNonce, setApplyNonce] = useState(0);
   const [isApplying, setIsApplying] = useState(false);
   const [editorOpen, setEditorOpen] = useState(false);
+  const [isLocating, setIsLocating] = useState(false);
+  const [locationError, setLocationError] = useState("");
+  const [currentLocation, setCurrentLocation] = useState(null);
   const effectiveStops = currentStops;
   const hasAmapKey = Boolean(process.env.NEXT_PUBLIC_AMAP_KEY);
   const hasOverride = !sameStops(currentStops, activeDay.stops);
   const bounds = getBounds(getSegmentPoints(effectiveStops));
+
+  useEffect(() => {
+    const stored = loadJson(CURRENT_LOCATION_KEY);
+    if (stored && typeof stored.lng === "number" && typeof stored.lat === "number") {
+      setCurrentLocation(stored);
+      onLocationCapture?.(stored);
+    }
+  }, [onLocationCapture]);
 
   useEffect(() => {
     const nextOverrides = loadJson(ROUTE_OVERRIDE_KEY);
@@ -1024,6 +1100,43 @@ export default function MapPanel({ activeDay, days, onRouteInfoChange, onStopsCh
     setApplyNonce((value) => value + 1);
   }
 
+  function captureCurrentLocation() {
+    if (typeof navigator === "undefined" || !navigator.geolocation) {
+      setLocationError("当前浏览器不支持定位");
+      return;
+    }
+
+    setIsLocating(true);
+    setLocationError("");
+
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const nextLocation = {
+          lng: Number(position.coords.longitude),
+          lat: Number(position.coords.latitude),
+          accuracy: Number(position.coords.accuracy || 0),
+          recordedAt: new Date().toISOString()
+        };
+        setCurrentLocation(nextLocation);
+        persistJson(CURRENT_LOCATION_KEY, nextLocation);
+        onLocationCapture?.(nextLocation);
+        setIsLocating(false);
+      },
+      (error) => {
+        const nextMessage = error?.code === 1
+          ? "定位权限被拒绝"
+          : error?.code === 2
+            ? "无法获取当前位置"
+            : error?.code === 3
+              ? "定位超时，请重试"
+              : "定位失败，请稍后重试";
+        setLocationError(nextMessage);
+        setIsLocating(false);
+      },
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+    );
+  }
+
   return (
     <div className="space-y-4">
       <div className="panel relative overflow-hidden rounded-[24px] p-4 sm:rounded-[28px] sm:p-5">
@@ -1039,10 +1152,31 @@ export default function MapPanel({ activeDay, days, onRouteInfoChange, onStopsCh
           </div>
         </div>
 
+        <div className="relative mt-4 flex flex-col gap-3 rounded-2xl border border-white/10 bg-white/5 p-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="min-w-0">
+            <div className="text-[11px] uppercase tracking-[0.18em] text-white/50">当前位置</div>
+            <div className="mt-2 text-sm text-white">
+              {currentLocation
+                ? `${formatCoord(currentLocation.lat, 5)}, ${formatCoord(currentLocation.lng, 5)}`
+                : "还没有记录当前位置"}
+            </div>
+            <div className="mt-1 text-xs text-white/50">
+              {currentLocation
+                ? `记录于 ${formatLocationTimestamp(currentLocation.recordedAt)}${currentLocation.accuracy ? ` · 精度约 ${Math.round(currentLocation.accuracy)}m` : ""}`
+                : "点右侧按钮后会调用浏览器定位并保存在本地"}
+            </div>
+            {locationError ? <div className="mt-2 text-xs text-amber-200">{locationError}</div> : null}
+          </div>
+          <button type="button" onClick={captureCurrentLocation} disabled={isLocating} className="inline-flex items-center justify-center gap-2 rounded-2xl border border-accent/30 bg-accent/10 px-4 py-3 text-sm text-accent transition hover:bg-accent/15 disabled:cursor-not-allowed disabled:opacity-50">
+            {isLocating ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <MapPinned className="h-4 w-4" />}
+            {isLocating ? "定位中..." : "记录当前位置"}
+          </button>
+        </div>
+
         {hasAmapKey ? (
-          <LiveAmap activeDay={activeDay} days={days} stops={effectiveStops} onRouteInfoChange={onRouteInfoChange} applyNonce={applyNonce} onPlanningChange={setIsApplying} />
+          <LiveAmap activeDay={activeDay} days={days} stops={effectiveStops} onRouteInfoChange={onRouteInfoChange} applyNonce={applyNonce} onPlanningChange={setIsApplying} currentLocation={currentLocation} />
         ) : (
-          <OfflineMap activeDay={activeDay} stops={effectiveStops} routeInfo={null} />
+          <OfflineMap activeDay={activeDay} stops={effectiveStops} routeInfo={null} currentLocation={currentLocation} />
         )}
 
         <div className="mt-4 grid gap-3 sm:grid-cols-3">
