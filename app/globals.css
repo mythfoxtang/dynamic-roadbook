@@ -47,15 +47,79 @@ a {
   text-decoration: none;
 }
 
+.hub-shell,
+.planner-shell {
+  position: relative;
+  background:
+    radial-gradient(circle at 18% 14%, rgba(239, 196, 126, 0.18), transparent 22%),
+    radial-gradient(circle at 82% 8%, rgba(110, 147, 123, 0.16), transparent 18%),
+    linear-gradient(180deg, #110e0c 0%, #18120f 30%, #231914 62%, #2d2018 100%);
+}
+
+.hub-shell::before,
+.planner-shell::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(125deg, transparent 0 34%, rgba(255, 231, 193, 0.06) 34.2% 34.6%, transparent 34.8%),
+    linear-gradient(0deg, rgba(255, 247, 228, 0.06), transparent 24%),
+    radial-gradient(circle at 70% 16%, rgba(255, 224, 177, 0.12) 0 8rem, transparent 8.2rem);
+  opacity: 0.85;
+}
+
+.hub-hero,
+.planner-hero {
+  position: relative;
+  background:
+    linear-gradient(135deg, rgba(32, 26, 21, 0.92), rgba(17, 14, 12, 0.76) 50%, rgba(33, 29, 24, 0.9)),
+    radial-gradient(circle at 78% 24%, rgba(227, 181, 110, 0.16), transparent 20%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+.module-card {
+  box-shadow: 0 28px 80px rgba(0, 0, 0, 0.24);
+}
+
+.planner-chip,
+.planner-stat,
+.draft-day {
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(14px);
+}
+
 .roadbook-shell {
   position: relative;
   background-image:
+    linear-gradient(180deg, rgba(7, 8, 10, 0.16), rgba(7, 8, 10, 0.7)),
+    linear-gradient(135deg, rgba(10, 12, 15, 0.54), rgba(10, 12, 15, 0.12) 36%, rgba(10, 12, 15, 0.6)),
     var(--scene-gradient, linear-gradient(180deg, rgba(255, 216, 160, 0.08), rgba(0, 0, 0, 0) 34%)),
+    var(--scene-image, linear-gradient(180deg, rgba(22, 18, 14, 0.72), rgba(22, 18, 14, 0.92))),
     radial-gradient(circle at 74% 10%, rgba(255, 230, 188, 0.34), transparent 20%),
     radial-gradient(circle at 18% 18%, rgba(109, 142, 126, 0.18), transparent 22%),
     linear-gradient(180deg, rgba(255, 245, 222, 0.14), rgba(255, 245, 222, 0.02) 20%, transparent 34%),
     linear-gradient(180deg, rgba(13, 11, 9, 0.04), rgba(13, 11, 9, 0.36));
-  background-size: 100% 100%;
+  background-position:
+    center,
+    center,
+    center,
+    var(--scene-image-position, center 36%),
+    center,
+    center,
+    center,
+    center;
+  background-size:
+    100% 100%,
+    100% 100%,
+    100% 100%,
+    cover,
+    100% 100%,
+    100% 100%,
+    100% 100%,
+    100% 100%;
+  background-repeat: no-repeat;
   isolation: isolate;
 }
 
@@ -71,28 +135,26 @@ a {
   z-index: 0;
   opacity: 1;
   background:
-    radial-gradient(circle at 76% 13%, rgba(255, 219, 157, 0.98) 0 3.6rem, rgba(255, 219, 157, 0.32) 3.7rem 8.6rem, transparent 8.7rem),
-    radial-gradient(circle at 76% 13%, rgba(255, 244, 224, 0.14) 0 14rem, transparent 14.1rem),
-    radial-gradient(circle at 28% 24%, rgba(255, 250, 236, 0.08), transparent 24%),
-    repeating-radial-gradient(circle at 76% 12%, rgba(255, 239, 212, 0.18) 0 2px, transparent 2px 46px),
-    repeating-radial-gradient(circle at 34% 20%, rgba(255, 255, 255, 0.06) 0 1px, transparent 1px 54px),
-    linear-gradient(180deg, rgba(255, 250, 236, 0.18), rgba(255, 250, 236, 0.03) 24%, transparent 40%),
-    linear-gradient(180deg, transparent 46%, rgba(0, 0, 0, 0.08) 62%, rgba(0, 0, 0, 0.32) 100%);
-  box-shadow: inset 0 -180px 180px rgba(0, 0, 0, 0.28);
+    radial-gradient(circle at 76% 13%, rgba(255, 226, 171, 0.88) 0 3.3rem, rgba(255, 226, 171, 0.18) 3.4rem 8.6rem, transparent 8.7rem),
+    radial-gradient(circle at 76% 13%, rgba(255, 244, 224, 0.12) 0 14rem, transparent 14.1rem),
+    linear-gradient(180deg, rgba(255, 244, 223, 0.22), rgba(255, 244, 223, 0.06) 22%, transparent 42%),
+    linear-gradient(180deg, transparent 40%, rgba(10, 9, 8, 0.18) 60%, rgba(10, 9, 8, 0.5) 100%);
+  backdrop-filter: blur(4px) saturate(0.9);
+  box-shadow: inset 0 -200px 180px rgba(0, 0, 0, 0.36);
 }
 
 .roadbook-shell::after {
   z-index: 0;
   opacity: 1;
   background:
-    radial-gradient(circle at 68% 84%, rgba(246, 216, 160, 0.28) 0 0.75rem, transparent 0.8rem),
-    linear-gradient(124deg, transparent 0 47.4%, rgba(247, 226, 189, 0.7) 47.5% 48.1%, transparent 48.2% 100%),
-    linear-gradient(146deg, transparent 0 51.2%, rgba(247, 226, 189, 0.42) 51.3% 51.8%, transparent 51.9% 100%),
-    linear-gradient(0deg, rgba(8, 7, 6, 0.92) 0 18%, transparent 18.2%),
-    linear-gradient(0deg, rgba(22, 17, 13, 0.94) 0 30%, transparent 30.2%),
-    linear-gradient(0deg, rgba(44, 33, 25, 0.9) 0 43%, transparent 43.2%),
-    linear-gradient(0deg, rgba(88, 63, 45, 0.52) 0 51%, transparent 51.2%);
-  clip-path: polygon(0 100%, 0 72%, 7% 68%, 13% 58%, 21% 64%, 28% 52%, 37% 60%, 44% 45%, 51% 55%, 59% 41%, 66% 50%, 74% 35%, 82% 46%, 90% 33%, 96% 41%, 100% 38%, 100% 100%);
+    radial-gradient(circle at 66% 82%, rgba(246, 216, 160, 0.18) 0 0.75rem, transparent 0.8rem),
+    linear-gradient(124deg, transparent 0 47.4%, rgba(247, 226, 189, 0.26) 47.5% 48.1%, transparent 48.2% 100%),
+    linear-gradient(146deg, transparent 0 51.2%, rgba(247, 226, 189, 0.18) 51.3% 51.8%, transparent 51.9% 100%),
+    linear-gradient(0deg, rgba(7, 7, 7, 0.96) 0 18%, transparent 18.2%),
+    linear-gradient(0deg, rgba(14, 13, 12, 0.88) 0 30%, transparent 30.2%),
+    linear-gradient(0deg, rgba(27, 22, 18, 0.72) 0 43%, transparent 43.2%),
+    linear-gradient(0deg, rgba(57, 42, 30, 0.38) 0 51%, transparent 51.2%);
+  clip-path: polygon(0 100%, 0 74%, 8% 69%, 15% 61%, 23% 66%, 31% 56%, 39% 62%, 47% 49%, 56% 57%, 64% 44%, 72% 50%, 80% 37%, 89% 45%, 96% 40%, 100% 36%, 100% 100%);
 }
 
 .panel {
@@ -185,6 +247,11 @@ a {
 }
 
 @media (max-width: 640px) {
+  .hub-hero,
+  .planner-hero {
+    border-radius: 24px;
+  }
+
   .glitch-layer::before,
   .glitch-layer::after,
   .noise-mask {
@@ -192,7 +259,7 @@ a {
   }
 
   .roadbook-shell::before {
-    opacity: 0.78;
+    opacity: 0.88;
   }
 
   .roadbook-shell::after {

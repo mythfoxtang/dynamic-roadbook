@@ -3,15 +3,27 @@
 import Image from "next/image";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { Activity, Bot, Camera, ChevronDown, ChevronLeft, ChevronRight, Gauge, ImageIcon, Link2, List, Mountain, Plane, Route, Users, X } from "lucide-react";
+import { Activity, Bot, Camera, ChevronDown, ChevronLeft, ChevronRight, Gauge, ImageIcon, Link2, List, MapPinned, Mountain, Plane, Route, Users, X } from "lucide-react";
 import Timeline from "@/components/timeline";
 import MapPanel from "@/components/map-panel";
+import FullRouteOverview from "@/components/full-route-overview";
 import DayPhotoPanel from "@/components/day-photo-panel";
 import TripAiPanel from "@/components/trip-ai-panel";
+import BookingWorkbench from "@/components/booking-workbench";
+import DayRecommendationsPanel from "@/components/day-recommendations-panel";
+import { loadBookingState } from "@/lib/booking-state-store";
 import { loadDayExecutions, loadDayPlans, saveDayExecutions, saveDayPlans } from "@/lib/day-state-store";
 import { ROADBOOK_DAYS } from "@/lib/roadtrip-data";
 import { PLACE_META } from "@/lib/place-data";
 import { STOP_CATEGORY_META, inferStopCategory, inferStopDurationMinutes } from "@/lib/stop-categories";
+
+const SCENE_BACKDROP_FALLBACKS = {
+  plateau: { image: "/photos/mount-kailash.jpg", position: "center 24%" },
+  ice: { image: "/photos/xiata.jpg", position: "center 34%" },
+  desert: { image: "/photos/wensucanyon.jpg", position: "center 42%" },
+  lake: { image: "/photos/sailimu.jpg", position: "center 38%" },
+  city: { image: "/photos/tashikuergan.jpg", position: "center 32%" }
+};
 
 function StatCard({ icon: Icon, label, value, accent = "text-accent" }) {
   return (
@@ -88,6 +100,18 @@ function formatUpdateTime(value) {
     minute: "2-digit",
     hour12: false
   }).format(date);
+}
+
+function pickSceneBackdrop(day) {
+  const scenicHighlight = day.highlights.find((item) => typeof item.image === "string" && item.image.startsWith("/photos/"));
+  if (scenicHighlight) {
+    return {
+      image: scenicHighlight.image,
+      position: day.scene.key === "desert" ? "center 42%" : "center 36%"
+    };
+  }
+
+  return SCENE_BACKDROP_FALLBACKS[day.scene.key] || SCENE_BACKDROP_FALLBACKS.plateau;
 }
 
 function normalizeExecutionState(value) {
@@ -285,9 +309,76 @@ function samePhotoSummaries(a = [], b = []) {
   return JSON.stringify(a) === JSON.stringify(b);
 }
 
+function normalizeCustomStop(stop) {
+  if (!stop || typeof stop !== "object") return null;
+  const coord = Array.isArray(stop.coord) && stop.coord.length >= 2 ? [Number(stop.coord[0]), Number(stop.coord[1])] : null;
+  if (!coord || Number.isNaN(coord[0]) || Number.isNaN(coord[1])) return null;
+
+  return {
+    name: stop.name || "未命名地点",
+    coord,
+    custom: true,
+    category: stop.category || "waypoint",
+    durationMinutes: typeof stop.durationMinutes === "number" ? stop.durationMinutes : null
+  };
+}
+
 function StopBadge({ stop, category }) {
   const meta = STOP_CATEGORY_META[category] || STOP_CATEGORY_META.waypoint;
   return <span className={`rounded-full border px-3 py-1 text-xs ${meta.tone}`}>{getStopName(stop)} · {meta.label}</span>;
+}
+
+function BookingStatusSummary() {
+  const [bookingState, setBookingState] = useState({});
+
+  useEffect(() => {
+    const sync = () => setBookingState(loadBookingState());
+    sync();
+    window.addEventListener("storage", sync);
+    window.addEventListener("focus", sync);
+    return () => {
+      window.removeEventListener("storage", sync);
+      window.removeEventListener("focus", sync);
+    };
+  }, []);
+
+  const records = Object.values(bookingState);
+  const bookedCount = records.filter((item) => item?.status === "booked").length;
+  const openedCount = records.filter((item) => item?.status === "opened").length;
+  const totalTracked = records.filter((item) => item?.status === "booked" || item?.status === "opened").length;
+
+  return (
+    <section className="panel rounded-[24px] p-4 sm:p-5 sm:rounded-[28px]">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+        <div>
+          <div className="text-[11px] uppercase tracking-[0.24em] text-white/50">预订总览</div>
+          <div className="mt-2 text-xl font-semibold text-white">回到路书首页也能看到预订进度</div>
+        </div>
+        <div className="rounded-full border border-accent/25 bg-accent/10 px-4 py-2 text-xs tracking-[0.18em] text-accent">
+          {`${bookedCount} 已预订 / ${openedCount} 待确认`}
+        </div>
+      </div>
+
+      <div className="mt-4 grid gap-3 md:grid-cols-3">
+        <div className="panel-soft rounded-2xl p-4">
+          <div className="text-[11px] uppercase tracking-[0.18em] text-white/46">已预订</div>
+          <div className="mt-2 text-2xl font-semibold text-emerald-100">{bookedCount}</div>
+        </div>
+        <div className="panel-soft rounded-2xl p-4">
+          <div className="text-[11px] uppercase tracking-[0.18em] text-white/46">已跳转待确认</div>
+          <div className="mt-2 text-2xl font-semibold text-accent">{openedCount}</div>
+        </div>
+        <div className="panel-soft rounded-2xl p-4">
+          <div className="text-[11px] uppercase tracking-[0.18em] text-white/46">当前跟踪项</div>
+          <div className="mt-2 text-2xl font-semibold text-white">{totalTracked}</div>
+        </div>
+      </div>
+
+      <div className="mt-4 rounded-[20px] border border-dashed border-white/12 bg-white/5 px-4 py-4 text-sm leading-7 text-white/68">
+        这一版先做页面级回填和总览聚合。你在“预订”标签里更新状态后，回到首页顶部就能看到总进度。
+      </div>
+    </section>
+  );
 }
 function DailyPlanningPanel({ activeDay, activeStops, driveMinutes, stopMinutes, totalMinutes, executionState, onExecutionChange, locationSuggestion, onApplyLocationArrival }) {
   const [plan, setPlan] = useState({
@@ -680,6 +771,27 @@ export default function Dashboard() {
     });
   }, []);
 
+  const handleAppendStop = useCallback((dayId, stop) => {
+    const normalized = normalizeCustomStop(stop);
+    if (!normalized) return;
+
+    setStopsByDay((current) => {
+      const baseStops = current[dayId] ?? (ROADBOOK_DAYS.find((day) => day.id === dayId)?.stops || []);
+      const exists = baseStops.some((item) => {
+        const name = getStopName(item);
+        const coord = getStopCoord(item);
+        return name === normalized.name && coord && coord[0] === normalized.coord[0] && coord[1] === normalized.coord[1];
+      });
+
+      if (exists) return current;
+
+      return {
+        ...current,
+        [dayId]: [...baseStops, normalized]
+      };
+    });
+  }, []);
+
   const handleExecutionChange = useCallback((dayId, nextState) => {
     setExecutionByDay((current) => {
       const normalized = normalizeExecutionState(nextState);
@@ -730,6 +842,8 @@ export default function Dashboard() {
 
   const workspaceTabs = [
     { id: "progress", label: "进度", icon: Activity },
+    { id: "recommend", label: "推荐", icon: MapPinned },
+    { id: "booking", label: "预订", icon: Link2 },
     { id: "photos", label: "照片", icon: Camera },
     { id: "ai", label: "AI", icon: Bot },
     { id: "highlights", label: "亮点", icon: ImageIcon },
@@ -738,13 +852,16 @@ export default function Dashboard() {
 
   const showTimeline = !isMobile || mobileScreen === "timeline";
   const showDetail = !isMobile || mobileScreen === "detail";
+  const activeBackdrop = pickSceneBackdrop(activeDay);
 
   return (
     <main
       className="roadbook-shell min-h-screen overflow-hidden"
       style={{
         "--glitch-shift": `${glitchShift.toFixed(1)}px`,
-        "--scene-gradient": activeDay.scene.gradient
+        "--scene-gradient": activeDay.scene.gradient,
+        "--scene-image": `url("${activeBackdrop.image}")`,
+        "--scene-image-position": activeBackdrop.position
       }}
     >
       <div className="glitch-layer" />
@@ -804,7 +921,14 @@ export default function Dashboard() {
               )}
 
               <div className="grid gap-4 xl:grid-cols-[1.2fr,0.8fr]">
-                <MapPanel activeDay={activeDay} days={ROADBOOK_DAYS} onRouteInfoChange={handleRouteInfoChange} onStopsChange={handleStopsChange} onLocationCapture={setCapturedLocation} />
+                <MapPanel
+                  activeDay={activeDay}
+                  days={ROADBOOK_DAYS}
+                  externalStops={activeStops}
+                  onRouteInfoChange={handleRouteInfoChange}
+                  onStopsChange={handleStopsChange}
+                  onLocationCapture={setCapturedLocation}
+                />
 
                 <div className="panel rounded-[24px] p-4 sm:p-5 sm:rounded-[28px]">
                   <div className="flex items-center justify-between gap-4">
@@ -926,6 +1050,16 @@ export default function Dashboard() {
                     />
                   ) : null}
 
+                  {activeWorkspaceTab === "recommend" ? (
+                    <DayRecommendationsPanel
+                      activeDay={activeDay}
+                      activeStops={activeStops}
+                      onAddStop={(stop) => handleAppendStop(activeDay.id, stop)}
+                    />
+                  ) : null}
+
+                  {activeWorkspaceTab === "booking" ? <BookingWorkbench days={ROADBOOK_DAYS} /> : null}
+
                   {activeWorkspaceTab === "photos" ? (
                     <DayPhotoPanel
                       activeDay={activeDay}
@@ -953,6 +1087,8 @@ export default function Dashboard() {
                 </div>
               </section>
 
+              <BookingStatusSummary />
+
               <SectionBlock kicker="补充信息" title="当天线路备注" defaultOpen={false} meta={`DAY ${String(activeDay.day).padStart(2, "0")}`}>
                 <AnimatePresence mode="wait">
                   <motion.div
@@ -972,6 +1108,10 @@ export default function Dashboard() {
                     </div>
                   </motion.div>
                 </AnimatePresence>
+              </SectionBlock>
+
+              <SectionBlock kicker="补充信息" title="全程路线总览" defaultOpen={false} meta="全国尺度">
+                <FullRouteOverview days={ROADBOOK_DAYS} />
               </SectionBlock>
             </section>
           )}

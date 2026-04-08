@@ -1,5 +1,5 @@
-import Dashboard from "@/components/dashboard";
+import ModuleHub from "@/components/module-hub";
 
 export default function Page() {
-  return <Dashboard />;
+  return <ModuleHub />;
 }
