@@ -43,6 +43,7 @@ function getAutomationUserDataDir(customDir) {
 function parseDateParts(dateText) {
   const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateText || "");
   if (!match) return null;
+
   return {
     year: Number(match[1]),
     month: Number(match[2]),
@@ -53,9 +54,11 @@ function parseDateParts(dateText) {
 function computePriceSummary(prices) {
   const sorted = [...prices].sort((a, b) => a - b);
   if (!sorted.length) return null;
-  const mid = sorted[Math.floor(sorted.length / 2)];
+
   const min = sorted[0];
+  const mid = sorted[Math.floor(sorted.length / 2)];
   const max = sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * 0.75))];
+
   return { min, mid, max, sampleCount: sorted.length };
 }
 
@@ -64,6 +67,12 @@ function computeRisk(summary) {
   if (summary.sampleCount < 5 || summary.min >= 900) return "高";
   if (summary.min >= 600 || summary.mid >= 800) return "中";
   return "低";
+}
+
+function collectPrices(text) {
+  return [...String(text || "").matchAll(/[¥￥]\s*(\d{2,5})|(\d{2,5})\s*(?:起|每晚|\/间|元)/g)]
+    .map((item) => Number(item[1] || item[2]))
+    .filter((price) => Number.isFinite(price) && price >= 100 && price <= 5000);
 }
 
 async function clickFirstVisible(page, selectors, timeout = 1200) {
@@ -81,7 +90,7 @@ async function clickFirstVisible(page, selectors, timeout = 1200) {
   return false;
 }
 
-async function fillFirstVisible(page, selectors, value, timeout = 1500) {
+async function fillFirstVisible(page, selectors, value, timeout = 1600) {
   for (const selector of selectors) {
     try {
       const locator = page.locator(selector).first();
@@ -98,7 +107,7 @@ async function fillFirstVisible(page, selectors, value, timeout = 1500) {
 }
 
 async function dismissCommonPopups(page) {
-  await clickFirstVisible(page, ["text=知道了", "text=我知道了", "text=以后再说", "text=暂不开启", "text=关闭", "text=取消"], 800);
+  await clickFirstVisible(page, ["text=知道了", "text=我知道了", "text=以后再说", "text=暂不开启", "text=关闭", "text=取消"], 900);
 }
 
 async function fillDestination(page, keyword) {
@@ -106,16 +115,16 @@ async function fillDestination(page, keyword) {
     page,
     ['input[placeholder*="目的地"]', 'input[placeholder*="酒店"]', 'input[placeholder*="城市"]', 'input[placeholder*="景点"]', 'input[placeholder*="商圈"]'],
     keyword,
-    2500
+    2600
   );
 
   if (!ok) return false;
 
   await page.keyboard.press("Control+A").catch(() => {});
-  await page.keyboard.type(keyword, { delay: 60 }).catch(() => {});
+  await page.keyboard.type(keyword, { delay: 50 }).catch(() => {});
   await page.waitForTimeout(1200);
 
-  const picked = await clickFirstVisible(page, [`text=${keyword}`, '[class*="suggest"] li', '[class*="autocomplete"] li', '[role="option"]'], 2000);
+  const picked = await clickFirstVisible(page, [`text=${keyword}`, '[class*="suggest"] li', '[class*="autocomplete"] li', '[role="option"]'], 2200);
   if (!picked) await page.keyboard.press("Enter").catch(() => {});
   return true;
 }
@@ -169,16 +178,16 @@ async function calendarHasTargetMonth(page, year, month) {
 }
 
 async function moveCalendarMonth(page) {
-  return clickFirstVisible(page, ['button[aria-label*="下"]', 'button[title*="下"]', '[class*="next"]', '[class*="arrow-right"]', 'text=下个月', 'text=下一月'], 1000);
+  return clickFirstVisible(page, ['button[aria-label*="下"]', 'button[title*="下"]', '[class*="next"]', '[class*="arrow-right"]', "text=下个月", "text=下一月"], 1000);
 }
 
 async function clickCalendarDay(page, day) {
   const selectors = [`button:has-text("${day}")`, `td:has-text("${day}")`, `div:has-text("${day}")`, `span:has-text("${day}")`];
 
   for (const selector of selectors) {
-    const locator = page.locator(selector).first();
     try {
-      await locator.waitFor({ state: "visible", timeout: 800 });
+      const locator = page.locator(selector).first();
+      await locator.waitFor({ state: "visible", timeout: 900 });
       const text = (await locator.textContent())?.trim() || "";
       if (text !== String(day)) continue;
       await locator.click();
@@ -225,7 +234,6 @@ async function fillDates(page, checkIn, checkOut) {
     .catch(() => false);
 
   if (direct && directLooksGood) {
-    console.log("Date strategy: direct input succeeded.");
     return true;
   }
 
@@ -236,13 +244,11 @@ async function fillDates(page, checkIn, checkOut) {
   const checkInPicked = await selectDateFromCalendar(page, checkIn);
   await page.waitForTimeout(500);
   const checkOutPicked = await selectDateFromCalendar(page, checkOut);
-
-  console.log(`Date strategy: calendar fallback, checkIn=${checkInPicked}, checkOut=${checkOutPicked}`);
   return checkInPicked || checkOutPicked;
 }
 
 async function submitSearch(page) {
-  const clicked = await clickFirstVisible(page, ["text=搜索", "text=查找酒店", 'button:has-text("搜索")', '[data-testid*="search"]'], 1800);
+  const clicked = await clickFirstVisible(page, ["text=搜索", "text=查找酒店", 'button:has-text("搜索")', '[data-testid*="search"]'], 2000);
   if (!clicked) await page.keyboard.press("Enter").catch(() => {});
 }
 
@@ -255,9 +261,40 @@ async function waitForResults(page) {
 async function scrapeHotelProbe(page, input) {
   return page.evaluate((context) => {
     const bodyText = document.body?.innerText || "";
-    const matches = [...bodyText.matchAll(/[¥￥]\s*(\d{2,5})/g)].map((item) => Number(item[1])).filter((price) => price >= 100 && price <= 5000);
     const title = document.title || "";
     const hasLoginText = /登录|验证码|验证|请先登录/.test(bodyText);
+    const containsKeyword = [context.keyword, context.city].filter(Boolean).some((value) => bodyText.includes(value) || title.includes(value));
+    const selectorBuckets = [
+      '[data-testid*="price"]',
+      '[class*="price"]',
+      '[class*="Price"]',
+      '[class*="hotel"] [class*="amount"]',
+      '[class*="room"] [class*="amount"]'
+    ];
+
+    const visibleTexts = selectorBuckets.flatMap((selector) =>
+      [...document.querySelectorAll(selector)]
+        .filter((element) => {
+          const style = window.getComputedStyle(element);
+          return style.display !== "none" && style.visibility !== "hidden";
+        })
+        .map((element) => element.textContent || "")
+    );
+
+    const nearbyTexts = [...document.querySelectorAll("body *")]
+      .filter((element) => {
+        const style = window.getComputedStyle(element);
+        const text = element.textContent || "";
+        return style.display !== "none" && style.visibility !== "hidden" && text.length > 0 && text.length < 80 && /[¥￥]/.test(text);
+      })
+      .map((element) => element.textContent || "");
+
+    const prices = [...visibleTexts, ...nearbyTexts, bodyText].flatMap((text) =>
+      [...String(text).matchAll(/[¥￥]\s*(\d{2,5})|(\d{2,5})\s*(?:起|每晚|\/间|元)/g)]
+        .map((item) => Number(item[1] || item[2]))
+        .filter((price) => price >= 100 && price <= 5000)
+    );
+
     return {
       title,
       currentUrl: location.href,
@@ -265,8 +302,9 @@ async function scrapeHotelProbe(page, input) {
       city: context.city,
       checkIn: context.checkIn,
       checkOut: context.checkOut,
-      prices: matches.slice(0, 120),
-      hasLoginText
+      prices: prices.slice(0, 160),
+      hasLoginText,
+      containsKeyword
     };
   }, input);
 }
@@ -309,7 +347,8 @@ async function runCtripHotelFlow(input) {
 
   await waitForResults(page);
   const scraped = await scrapeHotelProbe(page, input);
-  const summary = computePriceSummary(scraped.prices);
+  const prices = [...new Set(scraped.prices)];
+  const summary = scraped.containsKeyword ? computePriceSummary(prices) : null;
   const result = {
     ok: !!summary,
     destinationOk,
@@ -326,7 +365,11 @@ async function runCtripHotelFlow(input) {
     sampleCount: summary?.sampleCount ?? 0,
     risk: computeRisk(summary),
     needsLogin: scraped.hasLoginText || !summary,
-    reason: summary ? "抓取到价格摘要" : "未能稳定抓取价格，可能需要登录或页面结构进一步适配"
+    reason: summary
+      ? "抓到当前查询结果页的价格摘要"
+      : scraped.containsKeyword
+        ? "结果页价格节点不稳定，暂时没有提取到可靠价格"
+        : "结果页没有稳定落到当前城市或关键词，已放弃返回伪价格"
   };
 
   await context.close();

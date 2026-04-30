@@ -50,10 +50,20 @@ function EmptyState({ text }) {
   );
 }
 
+function normalizeLocation(location) {
+  if (!location) return "";
+  if (typeof location === "string") return location;
+  if (typeof location.lng === "number" && typeof location.lat === "number") {
+    return `${location.lng},${location.lat}`;
+  }
+  if (typeof location.getLng === "function" && typeof location.getLat === "function") {
+    return `${location.getLng()},${location.getLat()}`;
+  }
+  return "";
+}
+
 function normalizePoi(item, index) {
-  const location = item?.location
-    ? `${item.location.lng},${item.location.lat}`
-    : "";
+  const location = normalizeLocation(item?.location);
 
   return {
     id: item?.id || `poi-${index}`,
@@ -69,6 +79,24 @@ function normalizePoi(item, index) {
     photo: item?.photos?.[0]?.url || "",
     distance: item?.distance || ""
   };
+}
+
+function dedupePois(list) {
+  const seen = new Set();
+  return list.filter((item) => {
+    const key = item.id || `${item.name}|${item.location}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+function filterPoisByKind(list, kind) {
+  const pattern = kind === "food"
+    ? /餐饮|美食|咖啡|茶馆|小吃|火锅|烧烤|甜品|酒吧|饭店|餐厅|面馆|食府|农家乐/
+    : /景点|风景|公园|古镇|古城|博物馆|观景|步道|湖|山|峡谷|湿地|乐园|寺|庙|遗址/;
+
+  return list.filter((item) => pattern.test(`${item.type} ${item.name}`));
 }
 
 export default function DayRecommendationsPanel({ activeDay, activeStops, onAddStop }) {
@@ -209,35 +237,60 @@ export default function DayRecommendationsPanel({ activeDay, activeStops, onAddS
     setError("");
 
     try {
-      const searchResult = await new Promise((resolve, reject) => {
+      const searchPlaces = ({ keyword, center, radius }) => new Promise((resolve, reject) => {
         const callback = (status, result) => {
-          if (status !== "complete") {
-            reject(new Error(result?.info || "搜索失败"));
+          if (status === "complete") {
+            const pois = (result?.poiList?.pois || []).map(normalizePoi).filter((item) => item.location);
+            resolve(pois);
             return;
           }
 
-          const pois = (result?.poiList?.pois || []).map(normalizePoi).filter((item) => item.location);
-          resolve(pois);
+          if (status === "no_data" || result?.info === "NO_DATA") {
+            resolve([]);
+            return;
+          }
+
+          reject(new Error(result?.info || result?.message || `高德搜索异常：${status || "未知状态"}`));
         };
 
-        if (anchorCoord) {
-          placeSearchRef.current.searchNearBy(keywordToSearch, anchorCoord, 12000, callback);
+        if (center) {
+          placeSearchRef.current.searchNearBy(keyword, center, radius, callback);
           return;
         }
 
-        placeSearchRef.current.search(keywordToSearch, callback);
+        placeSearchRef.current.search(keyword, callback);
       });
 
-      const filtered = searchResult.filter((item) =>
-        kind === "food"
-          ? /餐饮|美食|咖啡|茶馆|小吃|火锅|烧烤|甜品|酒吧/.test(`${item.type} ${item.name}`)
-          : /景点|风景|公园|古镇|古城|博物馆|观景|步道|湖|山|峡谷|湿地|乐园/.test(`${item.type} ${item.name}`)
-      );
+      const attempts = anchorCoord
+        ? [
+            { keyword: keywordToSearch, center: anchorCoord, radius: 12000 },
+            { keyword: keywordToSearch, center: anchorCoord, radius: 30000 },
+            { keyword: keywordToSearch, center: anchorCoord, radius: 60000 },
+            { keyword: `${anchorName} ${keywordToSearch}` },
+            { keyword: keywordToSearch }
+          ]
+        : [
+            { keyword: `${anchorName} ${keywordToSearch}` },
+            { keyword: keywordToSearch }
+          ];
 
-      setResults(filtered.length ? filtered : searchResult);
+      let searchResult = [];
+      for (const attempt of attempts) {
+        const nextResult = await searchPlaces(attempt);
+        searchResult = dedupePois([...searchResult, ...nextResult]);
+        if (filterPoisByKind(searchResult, kind).length || searchResult.length >= 8) break;
+      }
+
+      const filtered = filterPoisByKind(searchResult, kind);
+      const nextResults = filtered.length ? filtered : searchResult;
+
+      setResults(nextResults);
+      if (!nextResults.length) {
+        setError(`附近暂时没搜到${kind === "food" ? "餐饮" : "景点"}候选，可以换成更具体的关键词。`);
+      }
     } catch (nextError) {
       setResults([]);
-      setError(nextError?.message || "搜索失败");
+      setError(nextError?.message || "高德搜索暂时不可用");
     } finally {
       setLoading(false);
     }

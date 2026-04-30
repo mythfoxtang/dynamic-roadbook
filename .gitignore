@@ -7,3 +7,4 @@ node_modules
 *.err
 .automation/
 out/
+_tmp_tripsphere/

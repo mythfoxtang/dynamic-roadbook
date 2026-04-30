@@ -201,6 +201,18 @@ function FlightPanel({ activeDay }) {
 
 function OfflineMap({ activeDay, stops, routeInfo, currentLocation }) {
   const stagePoints = useMemo(() => getSegmentPoints(stops), [stops]);
+  const bounds = useMemo(() => getBounds(stagePoints), [stagePoints]);
+  const plottedPoints = useMemo(() => {
+    const lngSpan = Math.max(0.01, bounds.maxLng - bounds.minLng);
+    const latSpan = Math.max(0.01, bounds.maxLat - bounds.minLat);
+
+    return stagePoints.map((point) => ({
+      ...point,
+      x: ((point.coord[0] - bounds.minLng) / lngSpan) * 100,
+      y: (1 - (point.coord[1] - bounds.minLat) / latSpan) * 100
+    }));
+  }, [bounds, stagePoints]);
+  const routePath = plottedPoints.map((point) => `${point.x.toFixed(2)},${point.y.toFixed(2)}`).join(" ");
 
   if (activeDay.transport === "flight") return <FlightPanel activeDay={activeDay} />;
 
@@ -208,6 +220,34 @@ function OfflineMap({ activeDay, stops, routeInfo, currentLocation }) {
     <div className="mt-4 overflow-hidden rounded-[24px] border border-white/[0.08] bg-[linear-gradient(180deg,rgba(255,255,255,0.09),rgba(255,255,255,0.03))] p-4 sm:mt-5 sm:p-5">
       <div className="text-[11px] uppercase tracking-[0.18em] text-white/50">当天路线摘要</div>
       <div className="mt-3 text-lg text-white">{routeInfo ? formatRouteInfo(routeInfo) : "未接入在线导航"}</div>
+      <div className="relative mt-5 h-[360px] overflow-hidden rounded-[22px] border border-white/10 bg-[#071111] sm:h-[500px]">
+        <div className="absolute inset-0 opacity-70 [background-image:linear-gradient(rgba(255,255,255,.06)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,.06)_1px,transparent_1px)] [background-size:44px_44px]" />
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_24%_28%,rgba(116,184,176,.18),transparent_28%),radial-gradient(circle_at_74%_62%,rgba(214,180,110,.16),transparent_30%)]" />
+        <svg className="absolute inset-0 h-full w-full" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+          {routePath ? (
+            <polyline
+              points={routePath}
+              fill="none"
+              stroke="rgba(214,180,110,.92)"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth="1.8"
+              vectorEffect="non-scaling-stroke"
+            />
+          ) : null}
+        </svg>
+        {plottedPoints.map((point, index) => (
+          <div
+            key={`${activeDay.id}-offline-marker-${point.name}-${index}`}
+            className="absolute flex -translate-x-1/2 -translate-y-1/2 items-center gap-2"
+            style={{ left: `${point.x}%`, top: `${point.y}%` }}
+          >
+            <span className="flex h-7 min-w-7 items-center justify-center rounded-full bg-[#24555e] px-2 text-xs font-semibold text-white shadow-glow">{index + 1}</span>
+            <span className="max-w-[132px] truncate rounded-full border border-white/15 bg-black/55 px-3 py-1 text-xs text-white/86">{point.name}</span>
+          </div>
+        ))}
+        <div className="absolute bottom-4 left-4 rounded-full border border-white/10 bg-black/45 px-3 py-1 text-xs text-white/65">离线路线示意</div>
+      </div>
       <div className="mt-5 space-y-3">
         {stagePoints.map((point, index) => (
           <div key={`${activeDay.id}-offline-${point.name}-${index}`} className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white/78">
@@ -765,6 +805,7 @@ function LiveAmap({ activeDay, days, stops, onRouteInfoChange, applyNonce, onPla
     const markers = points.map((point, index) => new AMap.Marker({
       position: point.coord,
       anchor: "bottom-center",
+      bubble: true,
       content: createMarkerContent(index, point.name)
     }));
 
@@ -774,6 +815,7 @@ function LiveAmap({ activeDay, days, stops, onRouteInfoChange, applyNonce, onPla
     const path = route?.path?.length ? route.path : points.map((point) => point.coord);
     routeOverlayRef.current = new AMap.Polyline({
       path,
+      bubble: true,
       strokeColor: route?.path?.length ? "#d6b46e" : "#74b8b0",
       strokeWeight: route?.path?.length ? 6 : 4,
       strokeOpacity: 0.95,
@@ -797,6 +839,7 @@ function LiveAmap({ activeDay, days, stops, onRouteInfoChange, applyNonce, onPla
     const marker = new AMap.Marker({
       position: [location.lng, location.lat],
       anchor: "bottom-center",
+      bubble: true,
       content: `
         <div style="display:flex;align-items:center;gap:8px;transform:translate(-50%,-100%);">
           <div style="display:flex;height:18px;width:18px;align-items:center;justify-content:center;border-radius:999px;background:#34d399;box-shadow:0 0 0 6px rgba(52,211,153,.16);"></div>
@@ -953,11 +996,23 @@ function LiveAmap({ activeDay, days, stops, onRouteInfoChange, applyNonce, onPla
           center: stagePoints[0]?.coord || [88.5, 34.2],
           pitch: 0,
           terrain: false,
-          resizeEnable: true
+          resizeEnable: true,
+          dragEnable: true,
+          zoomEnable: true,
+          scrollWheel: true,
+          doubleClickZoom: true,
+          keyboardEnable: true
         });
 
         map.addControl(new AMap.Scale());
         map.addControl(new AMap.ToolBar({ position: "RB" }));
+        map.setStatus?.({
+          dragEnable: true,
+          zoomEnable: true,
+          scrollWheel: true,
+          doubleClickZoom: true,
+          keyboardEnable: true
+        });
         mapInstanceRef.current = map;
         activeDrivingRef.current = new AMap.Driving({ policy: 0, hideMarkers: true, showTraffic: false, map: null });
         preloadDrivingRef.current = new AMap.Driving({ policy: 0, hideMarkers: true, showTraffic: false, map: null });
@@ -1124,7 +1179,7 @@ export default function MapPanel({ activeDay, days, onRouteInfoChange, onStopsCh
       },
       (error) => {
         const nextMessage = error?.code === 1
-          ? "定位权限被拒绝"
+          ? "定位权限被拒绝。可在浏览器地址栏左侧重新允许；当天路线不受影响。"
           : error?.code === 2
             ? "无法获取当前位置"
             : error?.code === 3
@@ -1163,7 +1218,7 @@ export default function MapPanel({ activeDay, days, onRouteInfoChange, onStopsCh
             <div className="mt-1 text-xs text-white/50">
               {currentLocation
                 ? `记录于 ${formatLocationTimestamp(currentLocation.recordedAt)}${currentLocation.accuracy ? ` · 精度约 ${Math.round(currentLocation.accuracy)}m` : ""}`
-                : "点右侧按钮后会调用浏览器定位并保存在本地"}
+                : "定位只是可选的实时记录，不影响每天默认路线"}
             </div>
             {locationError ? <div className="mt-2 text-xs text-amber-200">{locationError}</div> : null}
           </div>

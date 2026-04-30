@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { BedDouble, CalendarRange, CarFront, CheckCircle2, Copy, ExternalLink, Plane, Ticket } from "lucide-react";
+import { BedDouble, CalendarRange, CarFront, CheckCircle2, Copy, ExternalLink, LoaderCircle, Plane, Ticket } from "lucide-react";
 import { buildBookingPlan } from "@/lib/booking-planner";
 import { loadBookingState, saveBookingState } from "@/lib/booking-state-store";
 
@@ -74,7 +74,98 @@ function CopyFieldButton({ label, value }) {
   );
 }
 
-function BookingAssistant({ itemId, assistant, portal, onOpenPortal, onUpdateState }) {
+function riskClassName(risk) {
+  if (risk === "高") return "border-warning/35 bg-warning/10 text-warning";
+  if (risk === "中") return "border-accent/30 bg-accent/10 text-accent";
+  return "border-emerald-300/20 bg-emerald-300/10 text-emerald-100";
+}
+
+function SignalPill({ risk }) {
+  return <div className={`rounded-full border px-3 py-1.5 text-xs ${riskClassName(risk)}`}>{`风险 ${risk || "--"}`}</div>;
+}
+
+function ProbeSummary({ probeState, kind, onRunProbe }) {
+  const data = probeState.data;
+
+  return (
+    <div className="mt-4 rounded-[18px] border border-accent/18 bg-accent/8 px-4 py-4">
+      <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+        <div>
+          <div className="text-[11px] uppercase tracking-[0.18em] text-[#f0cb96]">价格信号</div>
+          <div className="mt-2 text-sm leading-7 text-white/74">
+            {kind === "flight" ? "直接从携程航班列表抓取价格、航班号、起降时间和中转信息。" : "直接探一版真实酒店价格，先判断这个落脚点值不值得住。"}
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={onRunProbe}
+          disabled={probeState.loading}
+          className="inline-flex items-center gap-2 rounded-full border border-accent/30 bg-accent/12 px-4 py-2.5 text-sm text-accent transition hover:bg-accent/16 disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          {probeState.loading ? <LoaderCircle className="h-4 w-4 animate-spin" /> : null}
+          {probeState.loading ? "探测中" : kind === "flight" ? "查机票" : "探测价格"}
+        </button>
+      </div>
+
+      {probeState.error ? (
+        <div className="mt-4 rounded-[16px] border border-warning/30 bg-warning/10 px-4 py-3 text-sm leading-7 text-warning">
+          {probeState.error}
+        </div>
+      ) : null}
+
+      {data ? (
+        <div className="mt-4">
+          <div className="flex flex-wrap items-center gap-3">
+            <SignalPill risk={data.risk} />
+            <div className="text-sm text-white/65">{data.reason || "已抓到价格摘要"}</div>
+          </div>
+          <div className="mt-4 grid gap-3 md:grid-cols-3">
+            <PriceBox label="最低价" value={data.minPrice ? `¥${data.minPrice}` : "--"} />
+            <PriceBox label="参考价" value={data.referencePrice ? `¥${data.referencePrice}` : "--"} />
+            <PriceBox label={kind === "flight" ? "航班数" : "样本量"} value={kind === "flight" ? data.flightCount || data.flights?.length || 0 : data.sampleCount || 0} />
+          </div>
+          {kind === "flight" ? <FlightResults flights={data.flights || []} /> : null}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function PriceBox({ label, value }) {
+  return (
+    <div className="rounded-[16px] border border-white/10 bg-black/12 px-4 py-3">
+      <div className="text-[11px] uppercase tracking-[0.18em] text-white/38">{label}</div>
+      <div className="mt-2 text-lg text-white">{value}</div>
+    </div>
+  );
+}
+
+function FlightResults({ flights }) {
+  if (!flights.length) return null;
+
+  return (
+    <div className="mt-4 space-y-3">
+      {flights.slice(0, 6).map((flight) => (
+        <div key={flight.id || `${flight.flightNo}-${flight.departureTime}-${flight.price}`} className="rounded-[16px] border border-white/10 bg-black/12 px-4 py-3">
+          <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
+            <div>
+              <div className="text-sm font-semibold text-white">{[flight.airline, flight.flightNo].filter(Boolean).join(" · ") || "航班信息"}</div>
+              <div className="mt-2 text-sm text-white/72">
+                {`${flight.departureTime || "--"} -> ${flight.arrivalTime || "--"}${flight.duration ? ` · ${flight.duration}` : ""}`}
+              </div>
+              <div className="mt-1 text-xs leading-5 text-white/48">
+                {[flight.departureAirport, flight.arrivalAirport, flight.stopInfo].filter(Boolean).join(" / ") || flight.rawText || "携程航班卡片"}
+              </div>
+            </div>
+            <div className="text-lg text-white">{flight.price ? `¥${flight.price}` : "--"}</div>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function BookingAssistant({ itemId, assistant, portal, onOpenPortal, onUpdateState, probeState, onRunProbe }) {
   if (!assistant) return null;
 
   function openPortal() {
@@ -82,17 +173,22 @@ function BookingAssistant({ itemId, assistant, portal, onOpenPortal, onUpdateSta
     window.open(portal.href, "_blank", "noopener,noreferrer");
   }
 
+  const isFlight = assistant.kind === "flight";
+
   return (
     <div className="mt-4 rounded-[18px] border border-accent/18 bg-accent/8 px-4 py-4">
       <div className="text-[11px] uppercase tracking-[0.18em] text-[#f0cb96]">预订助手</div>
       <div className="mt-2 text-sm leading-7 text-white/74">
-        按下面顺序操作：先复制住宿地点和日期，再打开携程。如果携程默认按定位展示，直接粘贴即可。
+        {isFlight ? "先查一版携程实时航班，确认价格、时间和中转，再打开携程做最终下单。" : "先复制住宿地点和日期，再打开携程。需要判断价格时，可以先跑价格探针。"}
       </div>
 
       <div className="mt-4 grid gap-3 md:grid-cols-3">
         {assistant.location ? <CopyFieldButton label="住宿地点" value={assistant.location} /> : null}
         {assistant.checkIn ? <CopyFieldButton label="入住日期" value={assistant.checkIn} /> : null}
         {assistant.checkOut ? <CopyFieldButton label="离店日期" value={assistant.checkOut} /> : null}
+        {assistant.from ? <CopyFieldButton label="出发地" value={assistant.from} /> : null}
+        {assistant.to ? <CopyFieldButton label="到达地" value={assistant.to} /> : null}
+        {assistant.date ? <CopyFieldButton label="出发日期" value={assistant.date} /> : null}
       </div>
 
       <div className="mt-4 flex flex-wrap gap-2">
@@ -104,7 +200,7 @@ function BookingAssistant({ itemId, assistant, portal, onOpenPortal, onUpdateSta
           }}
           className="inline-flex items-center gap-2 rounded-full border border-accent/30 bg-accent/12 px-4 py-2.5 text-sm text-accent transition hover:bg-accent/16"
         >
-          复制地点并打开携程
+          {isFlight ? "打开携程机票" : "复制地点并打开携程"}
           <ExternalLink className="h-4 w-4" />
         </button>
         <button
@@ -115,11 +211,13 @@ function BookingAssistant({ itemId, assistant, portal, onOpenPortal, onUpdateSta
           我已完成搜索
         </button>
       </div>
+
+      <ProbeSummary kind={assistant.kind || "hotel"} probeState={probeState} onRunProbe={onRunProbe} />
     </div>
   );
 }
 
-function BookingCard({ itemId, title, meta, fields, rationale, portals, assistant, bookingState, onOpenPortal, onUpdateState }) {
+function BookingCard({ itemId, title, meta, fields, rationale, portals, assistant, bookingState, onOpenPortal, onUpdateState, probeState, onRunProbe }) {
   const state = bookingState?.status || "todo";
   const orderRef = bookingState?.orderRef || "";
   const note = bookingState?.note || "";
@@ -153,7 +251,15 @@ function BookingCard({ itemId, title, meta, fields, rationale, portals, assistan
         {rationale}
       </div>
 
-      <BookingAssistant itemId={itemId} assistant={assistant} portal={portals[0]} onOpenPortal={onOpenPortal} onUpdateState={onUpdateState} />
+      <BookingAssistant
+        itemId={itemId}
+        assistant={assistant}
+        portal={portals[0]}
+        onOpenPortal={onOpenPortal}
+        onUpdateState={onUpdateState}
+        probeState={probeState}
+        onRunProbe={onRunProbe}
+      />
 
       <div className="mt-4 rounded-[18px] border border-white/10 bg-black/12 px-4 py-4">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
@@ -223,6 +329,8 @@ function BookingCard({ itemId, title, meta, fields, rationale, portals, assistan
 export default function BookingWorkbench({ days }) {
   const [activeTab, setActiveTab] = useState("hotel");
   const [bookingState, setBookingState] = useState({});
+  const [hotelProbeByItem, setHotelProbeByItem] = useState({});
+  const [flightProbeByItem, setFlightProbeByItem] = useState({});
   const bookingPlan = useMemo(() => buildBookingPlan(days), [days]);
 
   useEffect(() => {
@@ -269,6 +377,65 @@ export default function BookingWorkbench({ days }) {
     });
   }
 
+  async function runHotelProbe(itemId, assistant) {
+    if (!assistant?.location || !assistant?.checkIn || !assistant?.checkOut) return;
+
+    setHotelProbeByItem((current) => ({
+      ...current,
+      [itemId]: { loading: true, data: current[itemId]?.data || null, error: "" }
+    }));
+
+    try {
+      const response = await fetch("/api/hotel-price-probe", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          city: assistant.city || assistant.location,
+          keyword: assistant.location,
+          checkIn: assistant.checkIn,
+          checkOut: assistant.checkOut
+        })
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data?.error || "酒店探针失败");
+      setHotelProbeByItem((current) => ({ ...current, [itemId]: { loading: false, data, error: "" } }));
+    } catch (error) {
+      setHotelProbeByItem((current) => ({
+        ...current,
+        [itemId]: { loading: false, data: null, error: error?.message || "酒店探针失败" }
+      }));
+    }
+  }
+
+  async function runFlightProbe(itemId, assistant) {
+    if (!assistant?.from || !assistant?.to || !assistant?.date) return;
+
+    setFlightProbeByItem((current) => ({
+      ...current,
+      [itemId]: { loading: true, data: current[itemId]?.data || null, error: "" }
+    }));
+
+    try {
+      const response = await fetch("/api/flight-price-probe", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          from: assistant.from,
+          to: assistant.to,
+          date: assistant.date
+        })
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data?.error || "机票探针失败");
+      setFlightProbeByItem((current) => ({ ...current, [itemId]: { loading: false, data, error: "" } }));
+    } catch (error) {
+      setFlightProbeByItem((current) => ({
+        ...current,
+        [itemId]: { loading: false, data: null, error: error?.message || "机票探针失败" }
+      }));
+    }
+  }
+
   const sections = [
     { id: "hotel", label: "酒店", icon: BedDouble, count: bookingPlan.accommodation.length },
     { id: "transport", label: "交通", icon: Plane, count: bookingPlan.transport.length },
@@ -280,31 +447,39 @@ export default function BookingWorkbench({ days }) {
     if (activeTab === "hotel") {
       return (
         <div className="space-y-4">
-          {bookingPlan.accommodation.map((stay) => (
-            <BookingCard
-              key={stay.id}
-              itemId={stay.id}
-              title={`${stay.city} · ${stay.nights} 晚`}
-              meta={`DAY ${stay.coveredDays[0]}-${stay.coveredDays[stay.coveredDays.length - 1]}`}
-              fields={[
-                { label: "入住", value: stay.checkinDate || "--" },
-                { label: "退房", value: stay.checkoutDate || "--" },
-                { label: "建议城市 / 落点", value: stay.city },
-                { label: "携程搜索关键词", value: stay.stayKeyword || stay.city },
-                { label: "对应路书天数", value: stay.coveredDays.join(" / ") }
-              ]}
-              rationale={stay.rationale}
-              portals={[stay.portal]}
-              assistant={{
-                location: stay.stayKeyword || stay.city,
-                checkIn: stay.checkinDate || "",
-                checkOut: stay.checkoutDate || ""
-              }}
-              bookingState={bookingState[stay.id]}
-              onOpenPortal={markPortalOpened}
-              onUpdateState={updateItemState}
-            />
-          ))}
+          {bookingPlan.accommodation.map((stay) => {
+            const assistant = {
+              kind: "hotel",
+              city: stay.city || "",
+              location: stay.stayKeyword || stay.city,
+              checkIn: stay.checkinDate || "",
+              checkOut: stay.checkoutDate || ""
+            };
+
+            return (
+              <BookingCard
+                key={stay.id}
+                itemId={stay.id}
+                title={`${stay.city} · ${stay.nights} 晚`}
+                meta={`DAY ${stay.coveredDays[0]}-${stay.coveredDays[stay.coveredDays.length - 1]}`}
+                fields={[
+                  { label: "入住", value: stay.checkinDate || "--" },
+                  { label: "退房", value: stay.checkoutDate || "--" },
+                  { label: "建议城市 / 落点", value: stay.city },
+                  { label: "携程搜索关键词", value: stay.stayKeyword || stay.city },
+                  { label: "对应路书天数", value: stay.coveredDays.join(" / ") }
+                ]}
+                rationale={stay.rationale}
+                portals={[stay.portal]}
+                assistant={assistant}
+                bookingState={bookingState[stay.id]}
+                onOpenPortal={markPortalOpened}
+                onUpdateState={updateItemState}
+                probeState={hotelProbeByItem[stay.id] || { loading: false, data: null, error: "" }}
+                onRunProbe={() => runHotelProbe(stay.id, assistant)}
+              />
+            );
+          })}
         </div>
       );
     }
@@ -312,26 +487,37 @@ export default function BookingWorkbench({ days }) {
     if (activeTab === "transport") {
       return (
         <div className="space-y-4">
-          {bookingPlan.transport.map((item) => (
-            <BookingCard
-              key={item.id}
-              itemId={item.id}
-              title={item.title}
-              meta={`DAY ${item.day}`}
-              fields={[
-                { label: "日期", value: item.date || "--" },
-                { label: "交通类型", value: item.type },
-                { label: "出发地", value: item.from },
-                { label: "到达地", value: item.to }
-              ]}
-              rationale={item.rationale}
-              portals={[item.portal]}
-              assistant={null}
-              bookingState={bookingState[item.id]}
-              onOpenPortal={markPortalOpened}
-              onUpdateState={updateItemState}
-            />
-          ))}
+          {bookingPlan.transport.map((item) => {
+            const assistant = {
+              kind: "flight",
+              from: item.from,
+              to: item.to,
+              date: item.date || ""
+            };
+
+            return (
+              <BookingCard
+                key={item.id}
+                itemId={item.id}
+                title={item.title}
+                meta={`DAY ${item.day}`}
+                fields={[
+                  { label: "日期", value: item.date || "--" },
+                  { label: "交通类型", value: item.type },
+                  { label: "出发地", value: item.from },
+                  { label: "到达地", value: item.to }
+                ]}
+                rationale={item.rationale}
+                portals={[item.portal]}
+                assistant={assistant}
+                bookingState={bookingState[item.id]}
+                onOpenPortal={markPortalOpened}
+                onUpdateState={updateItemState}
+                probeState={flightProbeByItem[item.id] || { loading: false, data: null, error: "" }}
+                onRunProbe={() => runFlightProbe(item.id, assistant)}
+              />
+            );
+          })}
         </div>
       );
     }
@@ -357,6 +543,8 @@ export default function BookingWorkbench({ days }) {
           bookingState={bookingState[bookingPlan.carRental.id]}
           onOpenPortal={markPortalOpened}
           onUpdateState={updateItemState}
+          probeState={{ loading: false, data: null, error: "" }}
+          onRunProbe={() => {}}
         />
       );
     }
@@ -380,6 +568,8 @@ export default function BookingWorkbench({ days }) {
             bookingState={bookingState[item.id]}
             onOpenPortal={markPortalOpened}
             onUpdateState={updateItemState}
+            probeState={{ loading: false, data: null, error: "" }}
+            onRunProbe={() => {}}
           />
         ))}
       </div>
@@ -411,11 +601,7 @@ export default function BookingWorkbench({ days }) {
         </div>
 
         <div className="mt-4 rounded-[20px] border border-dashed border-[#e3b56e]/28 bg-[#e3b56e]/6 px-4 py-4 text-sm leading-7 text-white/68">
-          第一版先不做站内下单，而是把路书转成“可预订清单”，再跳到携程官方对应入口。等后面确认合作方式或开放能力，再考虑商品搜索、价格回填和订单回写。
-        </div>
-
-        <div className="mt-4 rounded-[20px] border border-white/10 bg-white/5 px-4 py-4 text-sm leading-7 text-white/68">
-          现在支持的“即时返还”是返回页面后的本地回填：你从携程回来后，可以立刻把该任务标成“已预订”，并记录订单号和备注。真正的自动回传订单状态，需要携程 / Trip.com 提供正式的订单接口、Webhook 或合作回调。
+          第一版先不做站内下单，而是把路书转成可预订清单。酒店和机票都可以先跑携程探针，拿到价格信号后再决定是否跳转下单。
         </div>
       </div>
 

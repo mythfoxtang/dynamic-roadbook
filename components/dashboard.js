@@ -698,6 +698,7 @@ export default function Dashboard() {
       name: getStopName(stop),
       durationMinutes: getStopDuration(stop, activeDay, index, activeStops.length)
     })),
+    stops: activeStops,
     routeMetrics: activeRouteMetrics ? {
       distanceKm: Number((activeRouteMetrics.distance / 1000).toFixed(1)),
       durationHours: Number((activeRouteMetrics.time / 3600).toFixed(1))
@@ -736,6 +737,17 @@ export default function Dashboard() {
   }, []);
 
   useEffect(() => {
+    const saved = loadDayPlans();
+    const restoredStops = Object.entries(saved).reduce((result, [key, value]) => {
+      if (key.startsWith("stops:") && Array.isArray(value)) {
+        result[key.slice(6)] = value;
+      }
+      return result;
+    }, {});
+    setStopsByDay(restoredStops);
+  }, []);
+
+  useEffect(() => {
     const media = window.matchMedia("(max-width: 1023px)");
     const syncViewport = () => {
       const nextIsMobile = media.matches;
@@ -764,10 +776,12 @@ export default function Dashboard() {
     setStopsByDay((current) => {
       const prev = current[dayId];
       if (sameStopsList(prev, stops)) return current;
-      return {
+      const next = {
         ...current,
         [dayId]: stops
       };
+      saveDayPlans({ ...loadDayPlans(), [`stops:${dayId}`]: stops });
+      return next;
     });
   }, []);
 
@@ -1068,7 +1082,16 @@ export default function Dashboard() {
                     />
                   ) : null}
 
-                  {activeWorkspaceTab === "ai" ? <TripAiPanel context={aiContext} /> : null}
+                  {activeWorkspaceTab === "ai" ? (
+                    <TripAiPanel
+                      context={aiContext}
+                      onApplyPatch={(patch) => {
+                        if (patch?.kind === "replace_stops" && Array.isArray(patch.updatedStops)) {
+                          handleStopsChange(activeDay.id, patch.updatedStops);
+                        }
+                      }}
+                    />
+                  ) : null}
 
                   {activeWorkspaceTab === "highlights" ? (
                     <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
