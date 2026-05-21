@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { LoaderCircle, MapPinned, Plane, Plus, Radar, RotateCcw, RotateCw, Route, Signal, X } from "lucide-react";
+import DayLogisticsPanel from "@/components/day-logistics-panel";
 import { PLACE_META } from "@/lib/place-data";
 import { STOP_CATEGORY_META, STOP_CATEGORY_OPTIONS, inferStopCategory, inferStopDurationMinutes } from "@/lib/stop-categories";
 
@@ -189,11 +190,15 @@ function FlightPanel({ activeDay }) {
     <div className="mt-4 overflow-hidden rounded-[24px] border border-white/10 bg-[linear-gradient(135deg,rgba(18,31,40,0.86),rgba(52,83,95,0.58))] p-6 sm:mt-5">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <div className="text-[11px] uppercase tracking-[0.24em] text-white/55">航班日</div>
-          <div className="mt-3 text-2xl font-semibold text-white">{activeDay.day === 1 ? "飞往丽江" : "飞回上海"}</div>
+          <div className="text-[11px] uppercase tracking-[0.24em] text-white/55">{activeDay.statusLabel || "交通日"}</div>
+          <div className="mt-3 text-2xl font-semibold text-white">{activeDay.transportHeadline || (activeDay.day === 1 ? "飞往丽江" : "飞回上海")}</div>
           <p className="mt-3 max-w-xl text-sm leading-7 text-white/75">{activeDay.routeText}</p>
         </div>
         <Plane className="h-8 w-8 shrink-0 text-white/75" />
+      </div>
+
+      <div className="mt-5">
+        <DayLogisticsPanel segments={activeDay.transportSegments || []} events={activeDay.dayEvents || []} compact title="交通段与节点" />
       </div>
     </div>
   );
@@ -1199,7 +1204,7 @@ export default function MapPanel({ activeDay, days, onRouteInfoChange, onStopsCh
         <div className="relative flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
           <div>
             <div className="text-[11px] uppercase tracking-[0.28em] text-white/50">地图图层</div>
-            <div className="mt-2 text-lg font-semibold text-white sm:text-xl">{activeDay.transport === "flight" ? "航班日视图" : "当天导航路线"}</div>
+            <div className="mt-2 text-lg font-semibold text-white sm:text-xl">{activeDay.transport === "flight" ? "交通日视图" : "当天导航路线"}</div>
           </div>
           <div className="flex items-center gap-2 text-xs tracking-[0.2em] text-white/50">
             <Signal className="h-4 w-4" />
@@ -1251,7 +1256,7 @@ export default function MapPanel({ activeDay, days, onRouteInfoChange, onStopsCh
           </div>
           <div className="panel-soft rounded-2xl p-4">
             <div className="text-[11px] uppercase tracking-[0.22em] text-white/50">当天模式</div>
-            <div className="mt-3 text-lg text-white">{activeDay.transport === "flight" ? "飞机" : hasOverride ? "自定义路线" : activeDay.scene.label}</div>
+            <div className="mt-3 text-lg text-white">{activeDay.transport === "flight" ? (activeDay.transportLabel || "飞机") : hasOverride ? "自定义路线" : activeDay.scene.label}</div>
           </div>
         </div>
       </div>

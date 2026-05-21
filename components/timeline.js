@@ -30,7 +30,7 @@ export default function Timeline({ activeDayId, onActiveDayChange }) {
         <div className="flex items-center justify-between gap-3">
           <div>
             <div className="text-[11px] uppercase tracking-[0.24em] text-white/45">时间线</div>
-            <div className="mt-2 text-base font-semibold text-white sm:text-lg">28 天路线总览</div>
+            <div className="mt-2 text-base font-semibold text-white sm:text-lg">{`${ROADBOOK_DAYS.length} 天路线总览`}</div>
           </div>
           <CalendarDays className="h-5 w-5 shrink-0 text-white/40" />
         </div>
@@ -97,7 +97,7 @@ export default function Timeline({ activeDayId, onActiveDayChange }) {
               </div>
 
               <div className="mt-3 flex flex-wrap gap-2 text-xs text-white/60">
-                <span>{day.transport === "flight" ? "飞机日" : day.distance ? `${day.distance} km` : "弹性安排"}</span>
+                <span>{day.transport === "flight" ? (day.transportLabel || "飞机日") : day.distance ? `${day.distance} km` : "弹性安排"}</span>
                 <span>{day.transport === "flight" ? "不安排驾车" : day.hours ? `${day.hours} h` : "时间机动"}</span>
                 <span>{`${day.estimatedAltitude} m`}</span>
               </div>

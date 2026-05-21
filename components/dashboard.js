@@ -7,6 +7,7 @@ import { Activity, Bot, Camera, ChevronDown, ChevronLeft, ChevronRight, Gauge, I
 import Timeline from "@/components/timeline";
 import MapPanel from "@/components/map-panel";
 import FullRouteOverview from "@/components/full-route-overview";
+import DayLogisticsPanel from "@/components/day-logistics-panel";
 import DayPhotoPanel from "@/components/day-photo-panel";
 import TripAiPanel from "@/components/trip-ai-panel";
 import BookingWorkbench from "@/components/booking-workbench";
@@ -509,32 +510,38 @@ function DailyPlanningPanel({ activeDay, activeStops, driveMinutes, stopMinutes,
   return (
     <SectionBlock kicker="时间计划" title="当天时间与天气" defaultOpen meta={activeDay.date || `DAY ${activeDay.day}`}>
       {activeDay.transport === "flight" ? (
-        <div className="grid gap-3 md:grid-cols-2">
-          <div className="panel-soft rounded-2xl p-4">
-            <div className="text-[11px] uppercase tracking-[0.18em] text-white/50">航班信息</div>
-            <div className="mt-3 grid gap-2">
-              <input value={plan.flightNo} onChange={(event) => updatePlan("flightNo", event.target.value)} placeholder="航班号，买好后再填" className="rounded-2xl border border-white/10 bg-white/10 px-4 py-3 text-sm text-white placeholder:text-white/35 outline-none" />
-              <input value={plan.departAirport} onChange={(event) => updatePlan("departAirport", event.target.value)} placeholder="出发机场" className="rounded-2xl border border-white/10 bg-white/10 px-4 py-3 text-sm text-white placeholder:text-white/35 outline-none" />
-              <input value={plan.arriveAirport} onChange={(event) => updatePlan("arriveAirport", event.target.value)} placeholder="到达机场" className="rounded-2xl border border-white/10 bg-white/10 px-4 py-3 text-sm text-white placeholder:text-white/35 outline-none" />
-              <div className="grid grid-cols-2 gap-2">
-                <input value={plan.flightDepartureTime} onChange={(event) => updatePlan("flightDepartureTime", event.target.value)} placeholder="起飞时间" className="rounded-2xl border border-white/10 bg-white/10 px-4 py-3 text-sm text-white placeholder:text-white/35 outline-none" />
-                <input value={plan.flightArrivalTime} onChange={(event) => updatePlan("flightArrivalTime", event.target.value)} placeholder="落地时间" className="rounded-2xl border border-white/10 bg-white/10 px-4 py-3 text-sm text-white placeholder:text-white/35 outline-none" />
+        <div className="space-y-3">
+          <DayLogisticsPanel segments={activeDay.transportSegments || []} events={activeDay.dayEvents || []} title="结构化交通信息" />
+
+          <div className="grid gap-3 md:grid-cols-2">
+            <div className="panel-soft rounded-2xl p-4">
+              <div className="text-[11px] uppercase tracking-[0.18em] text-white/50">补录信息</div>
+              <div className="mt-3 grid gap-2">
+                <input value={plan.flightNo} onChange={(event) => updatePlan("flightNo", event.target.value)} placeholder="如有改签或补充班次，在这里记录" className="rounded-2xl border border-white/10 bg-white/10 px-4 py-3 text-sm text-white placeholder:text-white/35 outline-none" />
+                <input value={plan.departAirport} onChange={(event) => updatePlan("departAirport", event.target.value)} placeholder="补充出发机场 / 车站" className="rounded-2xl border border-white/10 bg-white/10 px-4 py-3 text-sm text-white placeholder:text-white/35 outline-none" />
+                <input value={plan.arriveAirport} onChange={(event) => updatePlan("arriveAirport", event.target.value)} placeholder="补充到达机场 / 车站" className="rounded-2xl border border-white/10 bg-white/10 px-4 py-3 text-sm text-white placeholder:text-white/35 outline-none" />
+                <div className="grid grid-cols-2 gap-2">
+                  <input value={plan.flightDepartureTime} onChange={(event) => updatePlan("flightDepartureTime", event.target.value)} placeholder="补充出发时间" className="rounded-2xl border border-white/10 bg-white/10 px-4 py-3 text-sm text-white placeholder:text-white/35 outline-none" />
+                  <input value={plan.flightArrivalTime} onChange={(event) => updatePlan("flightArrivalTime", event.target.value)} placeholder="补充到达时间" className="rounded-2xl border border-white/10 bg-white/10 px-4 py-3 text-sm text-white placeholder:text-white/35 outline-none" />
+                </div>
               </div>
             </div>
-          </div>
-          <div className="panel-soft rounded-2xl p-4">
-            <div className="text-[11px] uppercase tracking-[0.18em] text-white/50">天气占位</div>
-            <div className="mt-3 grid gap-2">
-              <input value={plan.weatherSummary} onChange={(event) => updatePlan("weatherSummary", event.target.value)} placeholder="天气情况，后续可以接真实天气接口" className="rounded-2xl border border-white/10 bg-white/10 px-4 py-3 text-sm text-white placeholder:text-white/35 outline-none" />
-              <div className="grid grid-cols-2 gap-2">
-                <input value={plan.sunrise} onChange={(event) => updatePlan("sunrise", event.target.value)} placeholder="日出" className="rounded-2xl border border-white/10 bg-white/10 px-4 py-3 text-sm text-white placeholder:text-white/35 outline-none" />
-                <input value={plan.sunset} onChange={(event) => updatePlan("sunset", event.target.value)} placeholder="日落" className="rounded-2xl border border-white/10 bg-white/10 px-4 py-3 text-sm text-white placeholder:text-white/35 outline-none" />
+            <div className="panel-soft rounded-2xl p-4">
+              <div className="text-[11px] uppercase tracking-[0.18em] text-white/50">天气与光线</div>
+              <div className="mt-3 grid gap-2">
+                <input value={plan.weatherSummary} onChange={(event) => updatePlan("weatherSummary", event.target.value)} placeholder="天气情况，后续可以接真实天气接口" className="rounded-2xl border border-white/10 bg-white/10 px-4 py-3 text-sm text-white placeholder:text-white/35 outline-none" />
+                <div className="grid grid-cols-2 gap-2">
+                  <input value={plan.sunrise} onChange={(event) => updatePlan("sunrise", event.target.value)} placeholder="日出" className="rounded-2xl border border-white/10 bg-white/10 px-4 py-3 text-sm text-white placeholder:text-white/35 outline-none" />
+                  <input value={plan.sunset} onChange={(event) => updatePlan("sunset", event.target.value)} placeholder="日落" className="rounded-2xl border border-white/10 bg-white/10 px-4 py-3 text-sm text-white placeholder:text-white/35 outline-none" />
+                </div>
               </div>
             </div>
           </div>
         </div>
       ) : (
         <div className="space-y-3">
+          {activeDay.dayEvents?.length ? <DayLogisticsPanel segments={activeDay.transportSegments || []} events={activeDay.dayEvents || []} title="当天接驳与会合" /> : null}
+
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
             {summaryCards.map((item) => (
               <div key={`${activeDay.id}-${item.label}`} className="panel-soft rounded-2xl p-3">
@@ -888,7 +895,7 @@ export default function Dashboard() {
                 <div className="min-w-0">
                   <div className="text-[11px] uppercase tracking-[0.28em] text-white/50">动态路书</div>
                   <h1 className="mt-3 max-w-[14ch] text-2xl font-semibold leading-tight text-white sm:max-w-none sm:text-3xl">
-                    丽江 -&gt; 乌鲁木齐 / 28 天家庭自驾
+                    {`上海往返 / ${ROADBOOK_DAYS.length} 天家庭长线`}
                   </h1>
                 </div>
                 <div className="w-fit rounded-full border border-accent/30 bg-accent/10 px-4 py-2 text-xs tracking-[0.22em] text-accent">
@@ -905,7 +912,7 @@ export default function Dashboard() {
             <StatCard
               icon={activeDay.transport === "flight" ? Plane : Route}
               label={activeDay.transport === "flight" ? "当天交通" : "当日里程"}
-              value={activeDay.transport === "flight" ? "飞机" : formatRouteDistance(activeRouteMetrics, activeDay.distance)}
+              value={activeDay.transport === "flight" ? (activeDay.transportLabel || "飞机") : formatRouteDistance(activeRouteMetrics, activeDay.distance)}
               accent={activeDay.transport === "flight" ? "text-sky-100" : activeDay.distance >= 600 ? "text-warning" : "text-accentAlt"}
             />
             <StatCard icon={Gauge} label="累计里程" value={`${totalDistance.toLocaleString()} km`} accent="text-white" />
@@ -969,7 +976,7 @@ export default function Dashboard() {
                   <div className="mt-5 grid grid-cols-2 gap-3">
                     <div className="panel-soft rounded-2xl p-4">
                       <div className="text-[11px] uppercase tracking-[0.18em] text-white/50">{activeDay.transport === "flight" ? "当天交通" : "驾驶时长"}</div>
-                      <div className="mt-2 text-lg text-white">{activeDay.transport === "flight" ? "飞机往返" : formatRouteHours(activeRouteMetrics, activeDay.hours)}</div>
+                      <div className="mt-2 text-lg text-white">{activeDay.transport === "flight" ? (activeDay.transportLabel || "飞机") : formatRouteHours(activeRouteMetrics, activeDay.hours)}</div>
                     </div>
                     <div className="panel-soft rounded-2xl p-4">
                       <div className="text-[11px] uppercase tracking-[0.18em] text-white/50">海拔系数</div>
@@ -1002,7 +1009,7 @@ export default function Dashboard() {
                     </div>
                     <p className="mt-3 text-sm leading-6 text-white/65">
                       {activeDay.transport === "flight"
-                        ? "这一天是航班行程，不纳入驾车导航和里程规划。"
+                        ? "这一天以非自驾交通和接驳为主，不纳入驾车导航和里程规划。"
                         : `疲劳指数 = (${activeDay.distance || 0} / 100) x (${activeDay.hours || 0} / 5) x ${activeDay.altitudeFactor.toFixed(2)}`}
                     </p>
                   </div>

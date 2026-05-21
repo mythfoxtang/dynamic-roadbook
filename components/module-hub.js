@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { ArrowRight, Compass, Map, Route, Sparkles } from "lucide-react";
+import { ROADBOOK_DAYS } from "@/lib/roadtrip-data";
 
 const MODULES = [
   {
@@ -16,7 +17,7 @@ const MODULES = [
     kicker: "LIVE MODULE",
     href: "/roadbook",
     description: "承接已生成的路线，按天查看地图、执行进度、照片和分享信息。",
-    points: ["现有 28 天家庭自驾路书", "地图、时间和 AI 工作台", "直接进入当天执行视图"],
+    points: [`现有 ${ROADBOOK_DAYS.length} 天家庭长线路书`, "地图、时间和 AI 工作台", "直接进入当天执行视图"],
     accent: "from-[#b8d0bc] via-[#698f79] to-[#24372c]",
     icon: Route
   }

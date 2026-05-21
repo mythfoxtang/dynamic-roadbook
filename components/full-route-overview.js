@@ -76,6 +76,7 @@ function buildRouteDays(days, overrides) {
         day: day.day,
         stops,
         transport: day.transport,
+        transportLabel: day.transportLabel || null,
         distance: day.distance || 0,
         points: deduped
       };
@@ -139,7 +140,7 @@ function RouteList({ segments }) {
         <div key={segment.id} className="rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm text-white/72">
           <div className="flex items-center justify-between gap-3">
             <span className="text-white/90">Day {segment.day}</span>
-            <span className={segment.transport === "flight" ? "text-sky-200" : "text-accent"}>{segment.transport === "flight" ? "航班" : `${segment.distance.toLocaleString()} km`}</span>
+            <span className={segment.transport === "flight" ? "text-sky-200" : "text-accent"}>{segment.transport === "flight" ? (segment.transportLabel || "航班") : `${segment.distance.toLocaleString()} km`}</span>
           </div>
           <div className="mt-2 truncate text-xs text-white/50">
             {segment.points.map((point) => point.name).join(" - ")}
