@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
+import { ANCHOR_DECISION_RULES, ANCHOR_PROMPT_TEMPLATE, ANCHOR_WORKFLOW_STEPS } from "@/lib/anchor-planning-workflow";
 import {
   ArrowRight,
   CalendarRange,
@@ -26,11 +27,11 @@ const USER_TYPES = [
   {
     id: "semifinished",
     kicker: "PRIORITY 01",
-    title: "已有想法，未成完整行程",
-    summary: "适合先做路线骨架、住宿落脚点和机票可达性判断。",
+    title: "锚点明确，未成完整行程",
+    summary: "适合先锁定必去点，再做方向、区域簇、住宿落点和机票可达性判断。",
     icon: Users2,
     accent: "from-[#f0d2a7] via-[#c38a54] to-[#51311e]",
-    prompts: ["你已经确定哪些目的地？", "计划玩几天？", "更偏轻松还是高密度？", "是否不想频繁换酒店？"]
+    prompts: ["哪些锚点必须保留？", "主约束是花期、雪山、预约还是高反？", "起终点能不能反过来？", "哪些酒店必须可退？"]
   },
   {
     id: "detailed",
@@ -62,12 +63,6 @@ const USER_TYPES = [
 ];
 
 const COMMON_FIELDS = ["出发地", "出行日期", "天数", "同行人", "预算", "交通偏好", "旅行节奏", "特殊约束"];
-
-const FLOW_STEPS = [
-  { title: "先识别阶段", text: "先判断用户是从零开始，还是已经有骨架或详细计划。" },
-  { title: "收集关键信息", text: "只收集日期、目的地、预算和不可改动项这些关键字段。" },
-  { title: "并行跑查询", text: "先探酒店，再探机票，最后判断路线值不值得成立。" }
-];
 
 const PRODUCT_IDEAS = [
   "酒店价格和机票价格都应该前置参与路线决策。",
@@ -730,7 +725,7 @@ export default function TripPlannerWorkspace() {
           <article className="panel rounded-[28px] p-5 sm:p-6">
             <SectionHeader kicker="流程设计" title="规划与查询怎么串起来" icon={MapPinned} />
             <div className="mt-5 grid gap-3 md:grid-cols-3">
-              {FLOW_STEPS.map((step, index) => (
+              {ANCHOR_WORKFLOW_STEPS.map((step, index) => (
                 <div key={step.title} className="draft-day rounded-[24px] p-4">
                   <div className="text-[11px] uppercase tracking-[0.22em] text-[#f0cb96]/82">{`STEP 0${index + 1}`}</div>
                   <div className="mt-2 text-lg font-semibold text-white">{step.title}</div>
@@ -748,6 +743,20 @@ export default function TripPlannerWorkspace() {
                   {idea}
                 </div>
               ))}
+            </div>
+            <div className="mt-5 rounded-[24px] border border-[#e3b56e]/18 bg-[#e3b56e]/6 p-4">
+              <div className="text-[11px] uppercase tracking-[0.22em] text-[#f0cb96]">锚点型决策规则</div>
+              <div className="mt-3 space-y-2">
+                {ANCHOR_DECISION_RULES.slice(0, 4).map((rule) => (
+                  <div key={rule} className="rounded-[18px] border border-white/10 bg-black/12 px-4 py-3 text-sm leading-6 text-white/74">
+                    {rule}
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="mt-4 rounded-[24px] border border-white/10 bg-black/12 p-4">
+              <div className="text-[11px] uppercase tracking-[0.22em] text-white/44">给大模型的 Prompt 骨架</div>
+              <pre className="mt-3 max-h-52 overflow-auto whitespace-pre-wrap text-xs leading-6 text-white/62">{ANCHOR_PROMPT_TEMPLATE}</pre>
             </div>
           </article>
         </section>

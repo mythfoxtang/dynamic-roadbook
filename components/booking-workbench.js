@@ -217,7 +217,28 @@ function BookingAssistant({ itemId, assistant, portal, onOpenPortal, onUpdateSta
   );
 }
 
-function BookingCard({ itemId, title, meta, fields, rationale, portals, assistant, bookingState, onOpenPortal, onUpdateState, probeState, onRunProbe }) {
+function StrategyPanel({ strategy }) {
+  if (!strategy) return null;
+
+  return (
+    <div className="mt-4 rounded-[18px] border border-[#e3b56e]/18 bg-[#e3b56e]/8 px-4 py-4">
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+        <div>
+          <div className="text-[11px] uppercase tracking-[0.18em] text-[#f0cb96]">预订策略</div>
+          <div className="mt-2 text-sm leading-7 text-white/74">{strategy.reason}</div>
+        </div>
+        <div className="rounded-full border border-[#e3b56e]/25 bg-[#e3b56e]/10 px-3 py-1.5 text-xs text-[#f0cb96]">{`风险 ${strategy.risk || "--"}`}</div>
+      </div>
+      <div className="mt-4 grid gap-3 md:grid-cols-3">
+        <PriceBox label="下单窗口" value={strategy.bookingWindow || "--"} />
+        <PriceBox label="退改建议" value={strategy.refundPolicy || "--"} />
+        <PriceBox label="落点策略" value={strategy.locationStrategy || "--"} />
+      </div>
+    </div>
+  );
+}
+
+function BookingCard({ itemId, title, meta, fields, rationale, portals, assistant, strategy, bookingState, onOpenPortal, onUpdateState, probeState, onRunProbe }) {
   const state = bookingState?.status || "todo";
   const orderRef = bookingState?.orderRef || "";
   const note = bookingState?.note || "";
@@ -250,6 +271,8 @@ function BookingCard({ itemId, title, meta, fields, rationale, portals, assistan
       <div className="mt-4 rounded-[18px] border border-dashed border-white/12 bg-black/10 px-4 py-4 text-sm leading-7 text-white/68">
         {rationale}
       </div>
+
+      <StrategyPanel strategy={strategy} />
 
       <BookingAssistant
         itemId={itemId}
@@ -472,6 +495,7 @@ export default function BookingWorkbench({ days }) {
                 rationale={stay.rationale}
                 portals={[stay.portal]}
                 assistant={assistant}
+                strategy={stay.bookingStrategy}
                 bookingState={bookingState[stay.id]}
                 onOpenPortal={markPortalOpened}
                 onUpdateState={updateItemState}
@@ -510,6 +534,7 @@ export default function BookingWorkbench({ days }) {
                 rationale={item.rationale}
                 portals={[item.portal]}
                 assistant={assistant}
+                strategy={item.bookingStrategy}
                 bookingState={bookingState[item.id]}
                 onOpenPortal={markPortalOpened}
                 onUpdateState={updateItemState}
