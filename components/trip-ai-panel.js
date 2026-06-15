@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { Bot, Camera, CheckCircle2, LoaderCircle, Mail, RefreshCw, ShieldAlert, Sparkles } from "lucide-react";
+import { runTripAssistantAction } from "@/lib/trip-assistant";
 
 const AI_ACTIONS = [
   {
@@ -65,24 +66,17 @@ export default function TripAiPanel({ context, onApplyPatch }) {
     setPatch(null);
 
     try {
-      const response = await fetch("/api/trip-assistant", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          actionId: action.id,
-          note,
-          context
-        })
+      const data = runTripAssistantAction({
+        actionId: action.id,
+        note,
+        context
       });
-
-      const data = await response.json();
-      if (!response.ok) throw new Error(data?.error || "AI 请求失败");
 
       setResult(data?.reply || "这次没有拿到有效结果。");
       setPatch(data?.patch || null);
       setResultTitle(action.label);
     } catch (error) {
-      setErrorMessage(error?.message || "AI 请求失败");
+      setErrorMessage(error?.message || "行程助手执行失败");
     } finally {
       setIsLoading(false);
     }
@@ -110,7 +104,7 @@ export default function TripAiPanel({ context, onApplyPatch }) {
           <div className="text-[11px] uppercase tracking-[0.24em] text-white/50">AI 行程助手</div>
           <div className="mt-2 text-xl font-semibold text-white">先分析，再决定是否应用修改</div>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-white/65">
-            现在这块不只出建议。重排动作会返回结构化 patch，确认后可以直接应用到当天路线。
+            静态发布版会在浏览器本地生成建议。重排动作会返回结构化 patch，确认后可以直接应用到当天路线。
           </p>
         </div>
         <button

@@ -93,17 +93,17 @@ function ProbeSummary({ probeState, kind, onRunProbe }) {
         <div>
           <div className="text-[11px] uppercase tracking-[0.18em] text-[#f0cb96]">价格信号</div>
           <div className="mt-2 text-sm leading-7 text-white/74">
-            {kind === "flight" ? "直接从携程航班列表抓取价格、航班号、起降时间和中转信息。" : "直接探一版真实酒店价格，先判断这个落脚点值不值得住。"}
+            静态发布版不运行站内价格探针。先用上方外链打开携程，再把确认结果回填到本地清单。
           </div>
         </div>
         <button
           type="button"
           onClick={onRunProbe}
-          disabled={probeState.loading}
+          disabled
           className="inline-flex items-center gap-2 rounded-full border border-accent/30 bg-accent/12 px-4 py-2.5 text-sm text-accent transition hover:bg-accent/16 disabled:cursor-not-allowed disabled:opacity-60"
         >
           {probeState.loading ? <LoaderCircle className="h-4 w-4 animate-spin" /> : null}
-          {probeState.loading ? "探测中" : kind === "flight" ? "查机票" : "探测价格"}
+          {kind === "flight" ? "改用外链查机票" : "改用外链查酒店"}
         </button>
       </div>
 
@@ -179,7 +179,7 @@ function BookingAssistant({ itemId, assistant, portal, onOpenPortal, onUpdateSta
     <div className="mt-4 rounded-[18px] border border-accent/18 bg-accent/8 px-4 py-4">
       <div className="text-[11px] uppercase tracking-[0.18em] text-[#f0cb96]">预订助手</div>
       <div className="mt-2 text-sm leading-7 text-white/74">
-        {isFlight ? "先查一版携程实时航班，确认价格、时间和中转，再打开携程做最终下单。" : "先复制住宿地点和日期，再打开携程。需要判断价格时，可以先跑价格探针。"}
+        {isFlight ? "先复制出发到达信息，再打开携程确认价格、时间和中转。" : "先复制住宿地点和日期，再打开携程确认价格和位置。"}
       </div>
 
       <div className="mt-4 grid gap-3 md:grid-cols-3">
@@ -626,7 +626,7 @@ export default function BookingWorkbench({ days }) {
         </div>
 
         <div className="mt-4 rounded-[20px] border border-dashed border-[#e3b56e]/28 bg-[#e3b56e]/6 px-4 py-4 text-sm leading-7 text-white/68">
-          第一版先不做站内下单，而是把路书转成可预订清单。酒店和机票都可以先跑携程探针，拿到价格信号后再决定是否跳转下单。
+          静态发布版先不做站内下单和价格探针，而是把路书转成可预订清单。酒店和机票通过携程外链确认后，再把状态回填到本地。
         </div>
       </div>
 
