@@ -7,8 +7,14 @@
     "build": "next build",
     "start": "next start -H 0.0.0.0 -p 3000",
     "lint": "next lint",
+    "test:travel": "node --test lib/travel.test.mjs lib/travel-vault.test.mjs lib/travel-expansion.test.mjs",
+    "test:travel:ui": "node scripts/travel-ui.smoke.mjs",
+    "test:travel:live": "node scripts/travel-live-readonly.mjs",
     "booking:hotel": "node scripts/ctrip-hotel-assistant.mjs",
-    "booking:flight": "node scripts/ctrip-flight-assistant.mjs"
+    "booking:flight": "node scripts/ctrip-flight-assistant.mjs",
+    "monitor:flight": "node scripts/flight-monitor.mjs",
+    "test:agent": "node --test lib/travel-agent.test.mjs",
+    "test:agent:ui": "node scripts/agent-ui.smoke.mjs"
   },
   "dependencies": {
     "@amap/amap-jsapi-loader": "^1.0.1",

@@ -4,6 +4,15 @@ import { ROADBOOK_DAYS } from "@/lib/roadtrip-data";
 
 const MODULES = [
   {
+    title: "旅行智能体",
+    kicker: "DEEPSEEK",
+    href: "/agent/",
+    description: "已有确定行程？交给 DeepSeek 识别预订需求、查询真实候选并比较，你只需选择。",
+    points: ["用原话交代完整行程", "自动查询机票、住宿与租车", "选择房型和舱位，汇集我的选择"],
+    accent: "from-[#a9d4ba] via-[#527f68] to-[#20392d]",
+    icon: Sparkles
+  },
+  {
     title: "行程规划",
     kicker: "NEXT MODULE",
     href: "/planner",

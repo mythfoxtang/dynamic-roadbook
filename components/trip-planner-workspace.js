@@ -197,9 +197,10 @@ function PlannerAssistantResult({ data, progressMessage }) {
     <section className="mt-5 grid gap-5 xl:grid-cols-[1.02fr,0.98fr]">
       <article className="panel rounded-[28px] p-5 sm:p-6">
         <SectionHeader kicker="规划结果" title="第一版路线与决策建议" icon={Sparkles} />
+        {data?.model ? <p className="mt-3 text-sm text-white/60">{data.provider} / {data.model} · {data.notice}</p> : null}
 
         <div className="mt-5 rounded-[24px] border border-[#e3b56e]/18 bg-[#e3b56e]/6 p-4 text-sm leading-7 text-white/78">
-          {data?.analysis?.summary || progressMessage || "先提交一版规划信息，我会边探酒店、边探机票、边汇总结果。"}
+          {data?.analysis?.summary || progressMessage || "先提交规划信息，AI 将分析路线与下一步安排；真实价格请到预订页查询。"}
         </div>
 
         <div className="mt-5 grid gap-4 md:grid-cols-2">

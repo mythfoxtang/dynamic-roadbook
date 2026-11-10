@@ -97,8 +97,8 @@ export default function Timeline({ activeDayId, onActiveDayChange }) {
               </div>
 
               <div className="mt-3 flex flex-wrap gap-2 text-xs text-white/60">
-                <span>{day.transport === "flight" ? (day.transportLabel || "飞机日") : day.distance ? `${day.distance} km` : "弹性安排"}</span>
-                <span>{day.transport === "flight" ? "不安排驾车" : day.hours ? `${day.hours} h` : "时间机动"}</span>
+                <span>{day.transport === "flight" ? (day.transportLabel || "飞机日") : day.distance ? `约 ${day.distance} km` : "弹性安排"}</span>
+                <span>{day.transport === "flight" ? "不安排驾车" : day.hours ? `约 ${day.hours} h` : "时间机动"}</span>
                 <span>{`${day.estimatedAltitude} m`}</span>
               </div>
 

@@ -140,7 +140,7 @@ function RouteList({ segments }) {
         <div key={segment.id} className="rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm text-white/72">
           <div className="flex items-center justify-between gap-3">
             <span className="text-white/90">Day {segment.day}</span>
-            <span className={segment.transport === "flight" ? "text-sky-200" : "text-accent"}>{segment.transport === "flight" ? (segment.transportLabel || "航班") : `${segment.distance.toLocaleString()} km`}</span>
+            <span className={segment.transport === "flight" ? "text-sky-200" : "text-accent"}>{segment.transport === "flight" ? (segment.transportLabel || "航班") : `约 ${segment.distance.toLocaleString()} km`}</span>
           </div>
           <div className="mt-2 truncate text-xs text-white/50">
             {segment.points.map((point) => point.name).join(" - ")}
@@ -343,7 +343,7 @@ export default function FullRouteOverview({ days }) {
       </div>
 
       <div className="grid gap-3 lg:grid-cols-3">
-        <Metric icon={Route} label="驾驶总里程" value={`${route.driveDistance.toLocaleString()} km`} tone="text-accent" />
+        <Metric icon={Route} label="驾驶总里程（路书估算）" value={`约 ${route.driveDistance.toLocaleString()} km`} tone="text-accent" />
         <Metric icon={Plane} label="路线节点" value={`${route.stopCount} 站`} tone="text-accentAlt" />
         <Metric icon={Mountain} label="最高节点海拔" value={`${route.highestAltitude.toLocaleString()} m`} tone="text-sky-100" />
       </div>

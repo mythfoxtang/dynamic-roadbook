@@ -50,13 +50,13 @@ function statusTone(level) {
 }
 
 function formatRouteHours(routeMetrics, fallbackHours) {
-  if (!routeMetrics) return `${fallbackHours || 0} h`;
+  if (!routeMetrics) return fallbackHours ? `约 ${fallbackHours} h` : "0 h";
   const hours = (routeMetrics.time / 3600).toFixed(1).replace(/\.0$/, "");
   return `${hours} h`;
 }
 
 function formatRouteDistance(routeMetrics, fallbackDistance) {
-  if (!routeMetrics) return `${fallbackDistance || 0} km`;
+  if (!routeMetrics) return fallbackDistance ? `约 ${fallbackDistance} km` : "0 km";
   return `${(routeMetrics.distance / 1000).toFixed(0)} km`;
 }
 
@@ -915,7 +915,7 @@ export default function Dashboard() {
               value={activeDay.transport === "flight" ? (activeDay.transportLabel || "飞机") : formatRouteDistance(activeRouteMetrics, activeDay.distance)}
               accent={activeDay.transport === "flight" ? "text-sky-100" : activeDay.distance >= 600 ? "text-warning" : "text-accentAlt"}
             />
-            <StatCard icon={Gauge} label="累计里程" value={`${totalDistance.toLocaleString()} km`} accent="text-white" />
+            <StatCard icon={Gauge} label="全程估算里程" value={`约 ${totalDistance.toLocaleString()} km`} accent="text-white" />
           </header>
         )}
 

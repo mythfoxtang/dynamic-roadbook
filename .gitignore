@@ -1,6 +1,12 @@
 node_modules
 .next
+.next-travel-dev/
+.next-travel-expansion/
 .env.local
+.env.*.local
+.deploy_keys/
+.git_known_hosts
+.next-agent-dev/
 *.log
 .idea
 *.out

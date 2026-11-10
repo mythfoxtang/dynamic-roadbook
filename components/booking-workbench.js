@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { BedDouble, CalendarRange, CarFront, CheckCircle2, Copy, ExternalLink, LoaderCircle, Plane, Ticket } from "lucide-react";
+import { BedDouble, CalendarRange, CarFront, CheckCircle2, Copy, ExternalLink, Plane, Ticket } from "lucide-react";
+import BookingSearch from "@/components/booking-search";
 import { buildBookingPlan } from "@/lib/booking-planner";
 import { loadBookingState, saveBookingState } from "@/lib/booking-state-store";
 
@@ -74,61 +75,11 @@ function CopyFieldButton({ label, value }) {
   );
 }
 
-function riskClassName(risk) {
-  if (risk === "高") return "border-warning/35 bg-warning/10 text-warning";
-  if (risk === "中") return "border-accent/30 bg-accent/10 text-accent";
-  return "border-emerald-300/20 bg-emerald-300/10 text-emerald-100";
-}
-
-function SignalPill({ risk }) {
-  return <div className={`rounded-full border px-3 py-1.5 text-xs ${riskClassName(risk)}`}>{`风险 ${risk || "--"}`}</div>;
-}
-
-function ProbeSummary({ probeState, kind, onRunProbe }) {
-  const data = probeState.data;
-
-  return (
-    <div className="mt-4 rounded-[18px] border border-accent/18 bg-accent/8 px-4 py-4">
-      <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-        <div>
-          <div className="text-[11px] uppercase tracking-[0.18em] text-[#f0cb96]">价格信号</div>
-          <div className="mt-2 text-sm leading-7 text-white/74">
-            静态发布版不运行站内价格探针。先用上方外链打开携程，再把确认结果回填到本地清单。
-          </div>
-        </div>
-        <button
-          type="button"
-          onClick={onRunProbe}
-          disabled
-          className="inline-flex items-center gap-2 rounded-full border border-accent/30 bg-accent/12 px-4 py-2.5 text-sm text-accent transition hover:bg-accent/16 disabled:cursor-not-allowed disabled:opacity-60"
-        >
-          {probeState.loading ? <LoaderCircle className="h-4 w-4 animate-spin" /> : null}
-          {kind === "flight" ? "改用外链查机票" : "改用外链查酒店"}
-        </button>
-      </div>
-
-      {probeState.error ? (
-        <div className="mt-4 rounded-[16px] border border-warning/30 bg-warning/10 px-4 py-3 text-sm leading-7 text-warning">
-          {probeState.error}
-        </div>
-      ) : null}
-
-      {data ? (
-        <div className="mt-4">
-          <div className="flex flex-wrap items-center gap-3">
-            <SignalPill risk={data.risk} />
-            <div className="text-sm text-white/65">{data.reason || "已抓到价格摘要"}</div>
-          </div>
-          <div className="mt-4 grid gap-3 md:grid-cols-3">
-            <PriceBox label="最低价" value={data.minPrice ? `¥${data.minPrice}` : "--"} />
-            <PriceBox label="参考价" value={data.referencePrice ? `¥${data.referencePrice}` : "--"} />
-            <PriceBox label={kind === "flight" ? "航班数" : "样本量"} value={kind === "flight" ? data.flightCount || data.flights?.length || 0 : data.sampleCount || 0} />
-          </div>
-          {kind === "flight" ? <FlightResults flights={data.flights || []} /> : null}
-        </div>
-      ) : null}
-    </div>
-  );
+function TaskSearchButton({ kind, onLoadSearch }) {
+  return <div className="mt-4 border-t border-white/10 pt-4">
+<button type="button" onClick={onLoadSearch} className="rounded-xl border border-accent/30 bg-accent/12 px-4 py-3 text-sm text-accent">带入条件查询{kind === "flight" ? "机票" : kind === "car" ? "租车" : "酒店"}</button>
+<p className="mt-2 text-xs text-white/50">搜索条件可在上方修改，历史行程日期需更新后查询。</p>
+</div>;
 }
 
 function PriceBox({ label, value }) {
@@ -140,32 +91,7 @@ function PriceBox({ label, value }) {
   );
 }
 
-function FlightResults({ flights }) {
-  if (!flights.length) return null;
-
-  return (
-    <div className="mt-4 space-y-3">
-      {flights.slice(0, 6).map((flight) => (
-        <div key={flight.id || `${flight.flightNo}-${flight.departureTime}-${flight.price}`} className="rounded-[16px] border border-white/10 bg-black/12 px-4 py-3">
-          <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
-            <div>
-              <div className="text-sm font-semibold text-white">{[flight.airline, flight.flightNo].filter(Boolean).join(" · ") || "航班信息"}</div>
-              <div className="mt-2 text-sm text-white/72">
-                {`${flight.departureTime || "--"} -> ${flight.arrivalTime || "--"}${flight.duration ? ` · ${flight.duration}` : ""}`}
-              </div>
-              <div className="mt-1 text-xs leading-5 text-white/48">
-                {[flight.departureAirport, flight.arrivalAirport, flight.stopInfo].filter(Boolean).join(" / ") || flight.rawText || "携程航班卡片"}
-              </div>
-            </div>
-            <div className="text-lg text-white">{flight.price ? `¥${flight.price}` : "--"}</div>
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-function BookingAssistant({ itemId, assistant, portal, onOpenPortal, onUpdateState, probeState, onRunProbe }) {
+function BookingAssistant({ itemId, assistant, portal, onOpenPortal, onUpdateState, onLoadSearch }) {
   if (!assistant) return null;
 
   function openPortal() {
@@ -174,12 +100,13 @@ function BookingAssistant({ itemId, assistant, portal, onOpenPortal, onUpdateSta
   }
 
   const isFlight = assistant.kind === "flight";
+  const isCar = assistant.kind === "car";
 
   return (
     <div className="mt-4 rounded-[18px] border border-accent/18 bg-accent/8 px-4 py-4">
       <div className="text-[11px] uppercase tracking-[0.18em] text-[#f0cb96]">预订助手</div>
       <div className="mt-2 text-sm leading-7 text-white/74">
-        {isFlight ? "先复制出发到达信息，再打开携程确认价格、时间和中转。" : "先复制住宿地点和日期，再打开携程确认价格和位置。"}
+        {isCar ? "带入取还车城市和日期查询，或前往携程确认车型、保险与异地还车费。" : isFlight ? "先复制出发到达信息，再打开携程确认价格、时间和中转。" : "先复制住宿地点和日期，再打开携程确认价格和位置。"}
       </div>
 
       <div className="mt-4 grid gap-3 md:grid-cols-3">
@@ -200,7 +127,7 @@ function BookingAssistant({ itemId, assistant, portal, onOpenPortal, onUpdateSta
           }}
           className="inline-flex items-center gap-2 rounded-full border border-accent/30 bg-accent/12 px-4 py-2.5 text-sm text-accent transition hover:bg-accent/16"
         >
-          {isFlight ? "打开携程机票" : "复制地点并打开携程"}
+          {isCar ? "打开携程租车" : isFlight ? "打开携程机票" : "复制地点并打开携程"}
           <ExternalLink className="h-4 w-4" />
         </button>
         <button
@@ -212,7 +139,7 @@ function BookingAssistant({ itemId, assistant, portal, onOpenPortal, onUpdateSta
         </button>
       </div>
 
-      <ProbeSummary kind={assistant.kind || "hotel"} probeState={probeState} onRunProbe={onRunProbe} />
+      <TaskSearchButton kind={assistant.kind || "hotel"} onLoadSearch={onLoadSearch} />
     </div>
   );
 }
@@ -238,7 +165,7 @@ function StrategyPanel({ strategy }) {
   );
 }
 
-function BookingCard({ itemId, title, meta, fields, rationale, portals, assistant, strategy, bookingState, onOpenPortal, onUpdateState, probeState, onRunProbe }) {
+function BookingCard({ itemId, title, meta, fields, rationale, portals, assistant, strategy, bookingState, onOpenPortal, onUpdateState, onLoadSearch }) {
   const state = bookingState?.status || "todo";
   const orderRef = bookingState?.orderRef || "";
   const note = bookingState?.note || "";
@@ -280,8 +207,8 @@ function BookingCard({ itemId, title, meta, fields, rationale, portals, assistan
         portal={portals[0]}
         onOpenPortal={onOpenPortal}
         onUpdateState={onUpdateState}
-        probeState={probeState}
-        onRunProbe={onRunProbe}
+
+        onLoadSearch={onLoadSearch}
       />
 
       <div className="mt-4 rounded-[18px] border border-white/10 bg-black/12 px-4 py-4">
@@ -312,7 +239,7 @@ function BookingCard({ itemId, title, meta, fields, rationale, portals, assistan
               }`}
             >
               <CheckCircle2 className="h-4 w-4" />
-              已预订
+              已预订（手动记录）
             </button>
             <button
               type="button"
@@ -352,8 +279,8 @@ function BookingCard({ itemId, title, meta, fields, rationale, portals, assistan
 export default function BookingWorkbench({ days }) {
   const [activeTab, setActiveTab] = useState("hotel");
   const [bookingState, setBookingState] = useState({});
-  const [hotelProbeByItem, setHotelProbeByItem] = useState({});
-  const [flightProbeByItem, setFlightProbeByItem] = useState({});
+  const [searchPreset, setSearchPreset] = useState(null);
+  const [searchVersion, setSearchVersion] = useState(0);
   const bookingPlan = useMemo(() => buildBookingPlan(days), [days]);
 
   useEffect(() => {
@@ -371,6 +298,7 @@ export default function BookingWorkbench({ days }) {
       day: "2-digit",
       hour: "2-digit",
       minute: "2-digit",
+      timeZone: "Asia/Shanghai",
       hour12: false
     }).format(new Date());
   }
@@ -400,63 +328,27 @@ export default function BookingWorkbench({ days }) {
     });
   }
 
-  async function runHotelProbe(itemId, assistant) {
-    if (!assistant?.location || !assistant?.checkIn || !assistant?.checkOut) return;
-
-    setHotelProbeByItem((current) => ({
-      ...current,
-      [itemId]: { loading: true, data: current[itemId]?.data || null, error: "" }
-    }));
-
-    try {
-      const response = await fetch("/api/hotel-price-probe", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          city: assistant.city || assistant.location,
-          keyword: assistant.location,
-          checkIn: assistant.checkIn,
-          checkOut: assistant.checkOut
-        })
-      });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data?.error || "酒店探针失败");
-      setHotelProbeByItem((current) => ({ ...current, [itemId]: { loading: false, data, error: "" } }));
-    } catch (error) {
-      setHotelProbeByItem((current) => ({
-        ...current,
-        [itemId]: { loading: false, data: null, error: error?.message || "酒店探针失败" }
-      }));
+  function loadSearch(query) {
+    if(query.kind==='car') {
+      const preset={kind:'car',city:query.city,returnCity:query.returnCity,pickupAt:query.startDate?`${query.startDate}T10:00`:'',returnAt:query.endDate?`${query.endDate}T10:00`:''};
+      window.location.assign(`/travel/cars/?${new URLSearchParams(Object.entries(preset).filter(([,v])=>v))}`);return;
     }
+    if (query.kind === "hotel" || query.kind === "flight") {
+      const preset = query.kind === "flight" ? { ...query, from: query.origin || query.from, to: query.destination || query.to, date: query.startDate || query.date } : query;
+      window.location.assign(`/travel/?${new URLSearchParams(Object.entries(preset).filter(([, value]) => value !== undefined && value !== null).map(([key, value]) => [key, String(value)]))}`);
+      return;
+    }
+    setSearchPreset(query);
+    setSearchVersion((value) => value + 1);
+    document.getElementById("booking-search")?.scrollIntoView({ behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "start" });
   }
 
-  async function runFlightProbe(itemId, assistant) {
-    if (!assistant?.from || !assistant?.to || !assistant?.date) return;
+  function loadHotelSearch(itemId, assistant) {
+    loadSearch({ kind: "hotel", city: assistant.city || assistant.location, startDate: assistant.checkIn, endDate: assistant.checkOut });
+  }
 
-    setFlightProbeByItem((current) => ({
-      ...current,
-      [itemId]: { loading: true, data: current[itemId]?.data || null, error: "" }
-    }));
-
-    try {
-      const response = await fetch("/api/flight-price-probe", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          from: assistant.from,
-          to: assistant.to,
-          date: assistant.date
-        })
-      });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data?.error || "机票探针失败");
-      setFlightProbeByItem((current) => ({ ...current, [itemId]: { loading: false, data, error: "" } }));
-    } catch (error) {
-      setFlightProbeByItem((current) => ({
-        ...current,
-        [itemId]: { loading: false, data: null, error: error?.message || "机票探针失败" }
-      }));
-    }
+  function loadFlightSearch(itemId, assistant) {
+    loadSearch({ kind: "flight", from: assistant.from, to: assistant.to, date: assistant.date });
   }
 
   const sections = [
@@ -499,8 +391,7 @@ export default function BookingWorkbench({ days }) {
                 bookingState={bookingState[stay.id]}
                 onOpenPortal={markPortalOpened}
                 onUpdateState={updateItemState}
-                probeState={hotelProbeByItem[stay.id] || { loading: false, data: null, error: "" }}
-                onRunProbe={() => runHotelProbe(stay.id, assistant)}
+                onLoadSearch={() => loadHotelSearch(stay.id, assistant)}
               />
             );
           })}
@@ -538,8 +429,7 @@ export default function BookingWorkbench({ days }) {
                 bookingState={bookingState[item.id]}
                 onOpenPortal={markPortalOpened}
                 onUpdateState={updateItemState}
-                probeState={flightProbeByItem[item.id] || { loading: false, data: null, error: "" }}
-                onRunProbe={() => runFlightProbe(item.id, assistant)}
+                onLoadSearch={() => loadFlightSearch(item.id, assistant)}
               />
             );
           })}
@@ -564,12 +454,11 @@ export default function BookingWorkbench({ days }) {
           ]}
           rationale={bookingPlan.carRental.rationale}
           portals={[bookingPlan.carRental.portal]}
-          assistant={null}
+          assistant={{ kind: "car", from: bookingPlan.carRental.pickupCity, to: bookingPlan.carRental.returnCity, date: bookingPlan.carRental.pickupDate }}
           bookingState={bookingState[bookingPlan.carRental.id]}
           onOpenPortal={markPortalOpened}
           onUpdateState={updateItemState}
-          probeState={{ loading: false, data: null, error: "" }}
-          onRunProbe={() => {}}
+          onLoadSearch={() => loadSearch({ kind: "car", city: bookingPlan.carRental.pickupCity, returnCity: bookingPlan.carRental.returnCity, startDate: bookingPlan.carRental.pickupDate || "", endDate: bookingPlan.carRental.returnDate || "" })}
         />
       );
     }
@@ -593,8 +482,7 @@ export default function BookingWorkbench({ days }) {
             bookingState={bookingState[item.id]}
             onOpenPortal={markPortalOpened}
             onUpdateState={updateItemState}
-            probeState={{ loading: false, data: null, error: "" }}
-            onRunProbe={() => {}}
+              onLoadSearch={() => {}}
           />
         ))}
       </div>
@@ -603,6 +491,8 @@ export default function BookingWorkbench({ days }) {
 
   return (
     <section className="space-y-4">
+      <a href="/travel/" className="panel block rounded-2xl border border-accent/30 p-5 text-accent">国内机票与住宿：官方查价、分页、预算筛选及房型／舱位详情 →</a>
+      <BookingSearch key={searchVersion} initialQuery={searchPreset || { kind: "hotel", city: bookingPlan.accommodation[0]?.city || "", startDate: bookingPlan.accommodation[0]?.checkinDate || "", endDate: bookingPlan.accommodation[0]?.checkoutDate || "" }} />
       <div className="panel rounded-[24px] p-4 sm:p-5 sm:rounded-[28px]">
         <SectionTitle icon={CalendarRange} kicker="预订执行台" title="按路书生成预订任务" meta={`${bookingPlan.dateRange.startLabel} - ${bookingPlan.dateRange.endLabel}`} />
 
@@ -626,7 +516,7 @@ export default function BookingWorkbench({ days }) {
         </div>
 
         <div className="mt-4 rounded-[20px] border border-dashed border-[#e3b56e]/28 bg-[#e3b56e]/6 px-4 py-4 text-sm leading-7 text-white/68">
-          静态发布版先不做站内下单和价格探针，而是把路书转成可预订清单。酒店和机票通过携程外链确认后，再把状态回填到本地。
+          从下方任务带入查询条件，或在上方直接搜索。平台下单后可手动记录确认号；本地记录不会自动同步平台订单状态。
         </div>
       </div>
 

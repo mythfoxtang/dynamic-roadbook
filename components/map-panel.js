@@ -28,6 +28,10 @@ function persistJson(key, value) {
   } catch {}
 }
 
+function wait(ms) {
+  return new Promise((resolve) => window.setTimeout(resolve, ms));
+}
+
 function formatLocationTimestamp(value) {
   if (!value) return "--";
   const date = new Date(value);
@@ -101,8 +105,23 @@ function buildRouteRequest(points) {
   return {
     origin: points[0].coord,
     destination: points[points.length - 1].coord,
-    waypoints: points.slice(1, -1).map((point) => point.coord)
+    waypoints: points.slice(1, -1).map((point) => point.coord),
+    points
   };
+}
+
+function getCoordDistanceMeters(from, to) {
+  if (!Array.isArray(from) || !Array.isArray(to)) return 0;
+  const [fromLng, fromLat] = from.map(Number);
+  const [toLng, toLat] = to.map(Number);
+  if (![fromLng, fromLat, toLng, toLat].every(Number.isFinite)) return 0;
+  const toRad = (value) => (value * Math.PI) / 180;
+  const earthRadius = 6371000;
+  const dLat = toRad(toLat - fromLat);
+  const dLng = toRad(toLng - fromLng);
+  const a = Math.sin(dLat / 2) ** 2
+    + Math.cos(toRad(fromLat)) * Math.cos(toRad(toLat)) * Math.sin(dLng / 2) ** 2;
+  return 2 * earthRadius * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
 function getBounds(points) {
@@ -127,7 +146,8 @@ function formatDuration(seconds) {
 
 function formatRouteInfo(routeInfo) {
   if (!routeInfo) return "等待导航结果";
-  return `${(routeInfo.distance / 1000).toFixed(0)} km / ${formatDuration(routeInfo.time)}`;
+  const suffix = routeInfo.partial ? " · 部分示意" : "";
+  return `${(routeInfo.distance / 1000).toFixed(0)} km / ${formatDuration(routeInfo.time)}${suffix}`;
 }
 
 function normalizePathPoint(point) {
@@ -865,8 +885,20 @@ function LiveAmap({ activeDay, days, stops, onRouteInfoChange, applyNonce, onPla
     if (points.length) drawDayRoute(points, cached);
   }
 
-  function searchRoute(driving, request) {
+  function createDrivingInstance(fallbackDriving) {
+    const AMap = amapRef.current;
+    if (!AMap) return fallbackDriving;
+    return new AMap.Driving({ policy: 0, hideMarkers: true, showTraffic: false, map: null });
+  }
+
+  function searchSingleRoute(driving, request) {
     return new Promise((resolve, reject) => {
+      const routeDriving = createDrivingInstance(driving);
+      if (!routeDriving) {
+        reject(new Error("driving plugin is not ready"));
+        return;
+      }
+
       const callback = (status, result) => {
         if (status !== "complete" || !result?.routes?.length) {
           reject(new Error(result?.info || "route search failed"));
@@ -884,16 +916,66 @@ function LiveAmap({ activeDay, days, stops, onRouteInfoChange, applyNonce, onPla
           time: Number(primaryRoute.time || 0),
           tolls: Number(primaryRoute.tolls || 0),
           restriction: Number(primaryRoute.restriction || 0),
-          path
+          path,
+          partial: false
         });
       };
 
       if (request.waypoints.length) {
-        driving.search(request.origin, request.destination, { waypoints: request.waypoints }, callback);
+        routeDriving.search(request.origin, request.destination, { waypoints: request.waypoints }, callback);
       } else {
-        driving.search(request.origin, request.destination, callback);
+        routeDriving.search(request.origin, request.destination, callback);
       }
     });
+  }
+
+  async function searchSegmentedRoute(driving, request) {
+    const points = Array.isArray(request.points) ? request.points : [];
+    if (points.length < 2) throw new Error("not enough route points");
+
+    const aggregate = {
+      distance: 0,
+      time: 0,
+      tolls: 0,
+      restriction: 0,
+      path: [],
+      partial: false
+    };
+
+    for (let index = 0; index < points.length - 1; index += 1) {
+      const origin = points[index].coord;
+      const destination = points[index + 1].coord;
+      try {
+        const segment = await searchSingleRoute(driving, {
+          origin,
+          destination,
+          waypoints: [],
+          points: points.slice(index, index + 2)
+        });
+        aggregate.distance += segment.distance;
+        aggregate.time += segment.time;
+        aggregate.tolls += segment.tolls;
+        aggregate.restriction = Math.max(aggregate.restriction, segment.restriction);
+        aggregate.path.push(...(segment.path?.length ? segment.path : [origin, destination]));
+      } catch {
+        const fallbackDistance = getCoordDistanceMeters(origin, destination) * 1.35;
+        aggregate.distance += fallbackDistance;
+        aggregate.time += (fallbackDistance / 1000 / 35) * 3600;
+        aggregate.path.push(origin, destination);
+        aggregate.partial = true;
+      }
+    }
+
+    if (!aggregate.path.length) throw new Error("route search failed");
+    return aggregate;
+  }
+
+  async function searchRoute(driving, request) {
+    try {
+      return await searchSingleRoute(driving, request);
+    } catch {
+      return searchSegmentedRoute(driving, request);
+    }
   }
 
   async function preloadRoutes() {
@@ -928,6 +1010,7 @@ function LiveAmap({ activeDay, days, stops, onRouteInfoChange, applyNonce, onPla
         total: driveDays.length,
         running: index + 1 < targets.length
       });
+      if (index + 1 < targets.length) await wait(180);
     }
   }
 

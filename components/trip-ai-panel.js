@@ -1,8 +1,8 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import Link from "next/link";
 import { Bot, Camera, CheckCircle2, LoaderCircle, Mail, RefreshCw, ShieldAlert, Sparkles } from "lucide-react";
-import { runTripAssistantAction } from "@/lib/trip-assistant";
 
 const AI_ACTIONS = [
   {
@@ -48,6 +48,7 @@ export default function TripAiPanel({ context, onApplyPatch }) {
   const [result, setResult] = useState("");
   const [patch, setPatch] = useState(null);
   const [resultTitle, setResultTitle] = useState("");
+  const [resultMeta, setResultMeta] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [applyState, setApplyState] = useState("idle");
@@ -66,15 +67,28 @@ export default function TripAiPanel({ context, onApplyPatch }) {
     setPatch(null);
 
     try {
-      const data = runTripAssistantAction({
-        actionId: action.id,
-        note,
-        context
+      const response = await fetch("/api/trip-assistant", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          actionId: action.id,
+          note,
+          context
+        })
       });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(data?.error || "AI 行程助手执行失败");
+      }
 
       setResult(data?.reply || "这次没有拿到有效结果。");
       setPatch(data?.patch || null);
       setResultTitle(action.label);
+      setResultMeta(
+        data?.source === "model"
+          ? `模型已接入：${data.provider || "AI"} / ${data.model || ""}`
+          : data?.warning || "当前使用本地兜底结果"
+      );
     } catch (error) {
       setErrorMessage(error?.message || "行程助手执行失败");
     } finally {
@@ -86,6 +100,7 @@ export default function TripAiPanel({ context, onApplyPatch }) {
     setResult("");
     setPatch(null);
     setResultTitle("");
+    setResultMeta("");
     setErrorMessage("");
     setNote("");
     setApplyState("idle");
@@ -104,7 +119,7 @@ export default function TripAiPanel({ context, onApplyPatch }) {
           <div className="text-[11px] uppercase tracking-[0.24em] text-white/50">AI 行程助手</div>
           <div className="mt-2 text-xl font-semibold text-white">先分析，再决定是否应用修改</div>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-white/65">
-            静态发布版会在浏览器本地生成建议。重排动作会返回结构化 patch，确认后可以直接应用到当天路线。
+            使用已配置的模型分析当天行程。重排建议需由你确认后应用。<Link href="/settings/ai/" className="ml-2 text-accent underline">配置 DeepSeek API</Link>
           </p>
         </div>
         <button
@@ -186,6 +201,7 @@ export default function TripAiPanel({ context, onApplyPatch }) {
         ) : result ? (
           <div className="mt-4 rounded-[22px] border border-accent/20 bg-accent/10 px-4 py-4">
             <div className="mb-3 text-sm font-medium text-accent">{resultTitle}</div>
+            {resultMeta ? <div className="mb-3 text-xs text-white/55">{resultMeta}</div> : null}
             <div className="whitespace-pre-wrap text-sm leading-7 text-white/84">{result}</div>
 
             {patch ? (
