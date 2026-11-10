@@ -3,6 +3,7 @@ import Link from 'next/link';
 import {useEffect,useRef,useState} from 'react';
 import {AGENT_EXAMPLE} from '@/lib/travel-agent-example';
 import styles from './journey-agent.module.css';
+import {resolveAgentSelection} from '@/lib/travel-agent-selection.mjs';
 const STORE='roadbook-deepseek-agent-v1';
 const names={flight:'机票',hotel:'住宿',car:'租车',attraction:'门票与预约'};
 async function post(url,body,signal){
@@ -60,7 +61,14 @@ export default function JourneyAgent(){
     if(task.kind==='car'){setChoices(c=>({...c,[task.id]:{offer,selectedAt:new Date().toISOString()}}));return;}
     detailController.current?.abort();const abort=new AbortController();detailController.current=abort;
     setDetail({task,offer});setDetailBusy(true);
-    try{let search=results[task.id],current=offer;for(let attempt=0;attempt<4;attempt++){try{const data=await post('/api/travel/query/',{action:'detail',searchId:search.id,offerId:current.id,refresh:true},abort.signal);if(!abort.signal.aborted)setDetail({task,offer:current,data:data.data});break;}catch(e){if((e.code==='SEARCH_NOT_FOUND'||e.status===404)&&attempt<2){setDetail({task,offer,waiting:'正在重新查询所选候选的最新库存'});const data=await post('/api/travel/query/',{action:'search',...task.query,kind:task.kind},abort.signal);search=data.data;setResults(r=>({...r,[task.id]:{...search,state:search.offers?.length?'ready':'empty'}}));current=search.offers.find(o=>o.supplierId===offer.supplierId);if(!current)throw new Error('原候选已不在最新结果中，请从已更新的候选里重新选择');continue;}if(e.status===429&&e.code!=='DAILY_QUOTA'&&attempt<3){const seconds=Math.min(120,Math.max(2,e.retryAfter||62));setDetail({task,offer,waiting:`供应商限流，${seconds} 秒后自动读取详情`});await pause(seconds*1000,abort.signal);continue;}throw e;}}}
+    try{
+      const selected=await resolveAgentSelection({task,offer,search:results[task.id],signal:abort.signal,wait:pause,
+        request:(body,signal)=>post('/api/travel/query/',body,signal),
+        onWaiting:waiting=>setDetail({task,offer,waiting}),
+        onSearch:search=>{setResults(r=>({...r,[task.id]:{...search,state:search.offers?.length?'ready':'empty'}}));setRecommendations(r=>r.filter(item=>item.taskId!==task.id));}
+      });
+      if(!abort.signal.aborted)setDetail({task,...selected});
+    }
     catch(e){if(e.name!=='AbortError')setDetail({task,offer,error:e.message});}
     finally{if(detailController.current===abort)setDetailBusy(false);}
   }

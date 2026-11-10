@@ -14,7 +14,12 @@
     "booking:flight": "node scripts/ctrip-flight-assistant.mjs",
     "monitor:flight": "node scripts/flight-monitor.mjs",
     "test:agent": "node --test lib/travel-agent.test.mjs",
-    "test:agent:ui": "node scripts/agent-ui.smoke.mjs"
+    "test:agent:ui": "node scripts/agent-ui.smoke.mjs",
+    "service:build": "node scripts/build-service.mjs",
+    "service:start": "node scripts/roadbook-service.mjs start",
+    "service:status": "node scripts/roadbook-service.mjs status",
+    "service:stop": "node scripts/roadbook-service.mjs stop",
+    "service:restart": "node scripts/roadbook-service.mjs restart"
   },
   "dependencies": {
     "@amap/amap-jsapi-loader": "^1.0.1",

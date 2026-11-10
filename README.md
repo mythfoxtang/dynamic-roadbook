@@ -2,6 +2,8 @@
 
 DeepSeek 旅行智能体：`/agent/`。交代确定行程，由 DeepSeek 分析预订需求、自动执行机酒查询、比较实际候选；只需选择房型／舱位。支持配置加密恢复、自动等待限流、候选和选择恢复；选择不会创单。[真实测试结果、数据缺口与 Git 同步说明](docs/deepseek-agent-validation.md)。
 
+本机常驻服务：`http://localhost:3010/agent/`。`npm.cmd run service:build` 构建，`npm.cmd run service:start` 独立后台启动；支持健康检查与异常退出自动重启。[常驻服务及停止／更新命令](docs/local-service.md)。
+
 新增：高铁 `/travel/trains/` 与自驾租车 `/travel/cars/`，统一入口 `/travel/`。[高铁、租车与工作唤醒验证说明](docs/train-car-and-awake.md)记录真实接口覆盖、租车授权依赖、测试与Windows唤醒边界。
 
 国内机票与住宿正式查价入口：`/travel/`。支持途牛官方服务端 Key / 个人账号授权、中文城市与日期查询、多页结果、预算和条件筛选、候选比较、房型／舱位详情、用户确认的未支付订单提交。路书预订任务可以带入查询条件；过去的日期需要先修改。

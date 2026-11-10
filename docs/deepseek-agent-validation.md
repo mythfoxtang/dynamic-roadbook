@@ -32,7 +32,9 @@ DeepSeek 配置按浏览器会话加密存放于 `.automation/travel-private/ai-
 
 实际仓库是工作区下的 `动态路书开发中/` 子目录，外层目录本身不是仓库。GitHub连接器确认仓库 `mythfoxtang/dynamic-roadbook` 具有 pull/push 权限，远端main原版本为 `67f6a42d2df3e65379a977f9fde4c4448bfdea2a`。
 
-本机当前执行账号 `codexsandboxoffline` 无法读取现有SSH私钥；默认SSH还无法读取用户known_hosts。HTTPS直连GitHub也超时。因此本轮不能宣称已完成真实推送。脚本 `scripts/sync-git.ps1` 使用原有密钥和已验证known_hosts，将SSH配置保存到当前仓库，不修改全局配置、不关闭host校验、不强推。用户在自己的PowerShell运行 `powershell -ExecutionPolicy Bypass -File .\scripts\sync-git.ps1 -Push`，它会fetch、检查写权限、推送已提交内容并对比远端commit。脚本不会自动提交额外本地文件。
+最初执行账号无法读取旧SSH私钥，HTTPS直连也超时。后续已在本机生成新的配对密钥，由用户在GitHub添加公钥并授权写入；仓库本地配置改用 `ssh.github.com:443`，固定核对GitHub官方主机密钥，真实fetch及push预检已通过。`scripts/sync-git.ps1 -Push` 会推送已提交内容并再次fetch、比对本地与远端commit，不关闭主机校验、不强推，也不自动提交额外文件。配置和私钥不提交到仓库。
+
+服务现采用独立后台守护进程，健康检查、子进程自动重启、旧候选重新查价及限流恢复详见 [本地服务说明](local-service.md)。
 
 项目约定通知渠道已检查：微信为登录窗口，无法向文件传输助手发送阻塞通知；未尝试重复发送。
 

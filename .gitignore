@@ -7,6 +7,8 @@ node_modules
 .deploy_keys/
 .git_known_hosts
 .next-agent-dev/
+.next-service/
+.next-service-*/
 *.log
 .idea
 *.out
