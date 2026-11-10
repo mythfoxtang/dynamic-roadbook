@@ -19,7 +19,7 @@ try{
  await page.route('**/api/travel/query/',route=>{const body=route.request().postDataJSON();assert.ok(['search','detail'].includes(body.action),'Read-only boundary');return route.continue();});
  await page.goto(base+'/agent/');await page.waitForLoadState('networkidle');
  await page.getByRole('button',{name:'重新核实全部候选'}).click();
- await page.getByRole('button',{name:'交给 DeepSeek 安排',exact:true}).waitFor({timeout:300000});
+ await page.getByRole('button',{name:'重新核实全部候选',exact:true}).waitFor({timeout:300000});
  const report=await page.evaluate(()=>JSON.parse(localStorage.getItem('roadbook-deepseek-agent-v1')));
  fs.writeFileSync('.automation/agent-live-results.json',JSON.stringify(report,null,2));
  console.log(JSON.stringify({model:report.plan.analysis.model,tasks:report.plan.tasks.map(t=>({title:t.title,kind:t.kind,state:report.results[t.id]?.state,source:report.results[t.id]?.source,count:report.results[t.id]?.offers?.length,notice:report.results[t.id]?.notice})),recommendations:report.recommendations,errors},null,2));

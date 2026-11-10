@@ -2,6 +2,8 @@
 
 DeepSeek 旅行智能体：`/agent/`。交代确定行程，由 DeepSeek 分析预订需求、自动执行机酒查询、比较实际候选；只需选择房型／舱位。支持配置加密恢复、自动等待限流、候选和选择恢复；选择不会创单。[真实测试结果、数据缺口与 Git 同步说明](docs/deepseek-agent-validation.md)。
 
+现在支持继续对话、补查分页、按偏好筛选及高铁备选，保留已选内容。租车真实货源仍待授权。[可交互方案、真实核验与多源接入调研](docs/flexible-agent-research.md)。
+
 本机常驻服务：`http://localhost:3010/agent/`。`npm.cmd run service:build` 构建，`npm.cmd run service:start` 独立后台启动；支持健康检查与异常退出自动重启。[常驻服务及停止／更新命令](docs/local-service.md)。
 
 新增：高铁 `/travel/trains/` 与自驾租车 `/travel/cars/`，统一入口 `/travel/`。[高铁、租车与工作唤醒验证说明](docs/train-car-and-awake.md)记录真实接口覆盖、租车授权依赖、测试与Windows唤醒边界。

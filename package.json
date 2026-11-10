@@ -19,7 +19,8 @@
     "service:start": "node scripts/roadbook-service.mjs start",
     "service:status": "node scripts/roadbook-service.mjs status",
     "service:stop": "node scripts/roadbook-service.mjs stop",
-    "service:restart": "node scripts/roadbook-service.mjs restart"
+    "service:restart": "node scripts/roadbook-service.mjs restart",
+    "test:agent:dialogue": "node scripts/agent-dialogue.smoke.mjs"
   },
   "dependencies": {
     "@amap/amap-jsapi-loader": "^1.0.1",
