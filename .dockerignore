@@ -1,0 +1,12 @@
+node_modules
+.next*
+.git
+.automation
+.env*
+.deploy_keys
+*.log
+*.out
+*.err
+*.pdf
+deploy/*.env
+deploy/secrets*

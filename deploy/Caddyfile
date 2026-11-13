@@ -1,0 +1,6 @@
+{$ROADBOOK_DOMAIN} {
+  basic_auth {
+    {$ROADBOOK_TEST_USER} {$ROADBOOK_TEST_PASSWORD_HASH}
+  }
+  reverse_proxy roadbook:3000
+}

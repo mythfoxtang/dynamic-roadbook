@@ -20,7 +20,11 @@
     "service:status": "node scripts/roadbook-service.mjs status",
     "service:stop": "node scripts/roadbook-service.mjs stop",
     "service:restart": "node scripts/roadbook-service.mjs restart",
-    "test:agent:dialogue": "node scripts/agent-dialogue.smoke.mjs"
+    "test:agent:dialogue": "node scripts/agent-dialogue.smoke.mjs",
+    "share:start": "node scripts/cpolar-share.mjs start",
+    "share:status": "node scripts/cpolar-share.mjs status",
+    "share:stop": "node scripts/cpolar-share.mjs stop",
+    "test:share": "node scripts/cpolar-share.smoke.mjs"
   },
   "dependencies": {
     "@amap/amap-jsapi-loader": "^1.0.1",

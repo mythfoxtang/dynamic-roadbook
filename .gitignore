@@ -1,5 +1,6 @@
 node_modules
 .next
+.next*/
 .next-travel-dev/
 .next-travel-expansion/
 .env.local
@@ -15,4 +16,5 @@ node_modules
 *.err
 .automation/
 out/
+deploy/runtime.env
 _tmp_tripsphere/

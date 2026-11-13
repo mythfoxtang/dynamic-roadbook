@@ -5,8 +5,9 @@ import assert from 'node:assert/strict';
 const base=process.argv[2]||'http://localhost:3016';
 const executablePath=['C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe','C:/Program Files/Google/Chrome/Application/chrome.exe'].find(fs.existsSync);
 const browser=await chromium.launch({headless:true,executablePath});
-const query={kind:'hotel',city:'宜昌',startDate:'2099-11-16',endDate:'2099-11-17',adults:1,rooms:1};
-let plan={title:'fixture 对话行程',input:'fixture 行程',analysis:{model:'fixture'},days:[{date:'2099-11-16',city:'宜昌',activity:'抵达'},{date:'2099-11-17',city:'奉节',activity:'徒步'},{date:'2099-11-18',city:'上海',activity:'返回'}],assumptions:[],warnings:[],tasks:[{id:'task-1',kind:'flight',title:'上海到宜昌',reason:'出发',checks:[],query:{from:'上海',to:'宜昌',date:'2099-11-16'}},{id:'task-2',kind:'hotel',title:'宜昌住宿',reason:'住宿',checks:[],query},{id:'task-3',kind:'hotel',title:'三峡之巅住宿',reason:'待核实地点',checks:[],query:{...query,startDate:'2099-11-17',endDate:'2099-11-18',poi:'三峡之巅'}}]};
+const dates=[3,4,5].map(n=>new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Shanghai',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date(Date.now()+n*86400000)));
+const query={kind:'hotel',city:'宜昌',startDate:dates[0],endDate:dates[1],adults:1,rooms:1};
+let plan={title:'fixture 对话行程',input:'fixture 行程',analysis:{model:'fixture'},days:[{date:dates[0],city:'宜昌',activity:'抵达'},{date:dates[1],city:'奉节',activity:'徒步'},{date:dates[2],city:'上海',activity:'返回'}],assumptions:[],warnings:[],tasks:[{id:'task-1',kind:'flight',title:'上海到宜昌',reason:'出发',checks:[],query:{from:'上海',to:'宜昌',date:dates[0]}},{id:'task-2',kind:'hotel',title:'宜昌住宿',reason:'住宿',checks:[],query},{id:'task-3',kind:'hotel',title:'三峡之巅住宿',reason:'待核实地点',checks:[],query:{...query,startDate:dates[1],endDate:dates[2],poi:'三峡之巅'}}]};
 const hotelOffers=Array.from({length:12},(_,i)=>({id:`hotel-${i}`,supplierId:`hotel-supplier-${i}`,kind:'hotel',name:`fixture酒店${i}`,price:200+i*10,facilities:['停车场'],address:'fixture 地址',query}));
 const flight={id:'flight',supplierId:'flight-supplier',kind:'flight',name:'fixture已选航班',price:600,departureTime:'08:00',arrivalTime:'10:00'};
 const initial={plan,input:plan.input,results:{'task-1':{id:'flight-search',kind:'flight',source:'fixture',loadedPages:1,totalPages:1,offers:[flight]},'task-2':{id:'hotel-search',kind:'hotel',source:'fixture',loadedPages:1,totalPages:2,offers:hotelOffers.slice(0,4)},'task-3':{id:'wrong-city',source:'fixture',offers:[{id:'wrong',kind:'hotel',name:'错误城市酒店',price:1}]}},choices:{'task-1':{offer:flight,option:{name:'fixture经济舱'}},'task-2':{offer:hotelOffers[0],option:{name:'fixture大床房'}}},recommendations:[]};
@@ -19,7 +20,7 @@ try{
   if(body.action==='chat'){
    let actions=[];if(body.message.includes('更多'))actions=[{type:'more',taskId:'task-2',pages:1}];
    if(body.message.includes('250'))actions=[{type:'filter',taskId:'task-2',filters:{maxPrice:250,parking:true}}];
-   if(body.message.includes('高铁')){plan={...plan,tasks:[...plan.tasks,{id:'task-4',kind:'train',title:'高铁备选',alternativeTo:'task-1',checks:[],query:{from:'上海',to:'宜昌',date:'2099-11-16',mode:'3'}}]};actions=[{type:'add',taskId:'task-4'}];}
+   if(body.message.includes('高铁')){plan={...plan,tasks:[...plan.tasks,{id:'task-4',kind:'train',title:'高铁备选',alternativeTo:'task-1',checks:[],query:{from:'上海',to:'宜昌',date:dates[0],mode:'3'}}]};actions=[{type:'add',taskId:'task-4'}];}
    return route.fulfill({json:{reply:'fixture：按这轮要求调整，保留其他选择。',plan,actions}});
   }
   if(body.action==='recommend')return route.fulfill({json:{recommendations:[]}});

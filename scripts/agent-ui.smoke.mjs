@@ -9,7 +9,7 @@ const plan={title:'测试行程（fixture）',input:'测试行程',analysis:{mod
 try{
  const context=await browser.newContext({viewport:{width:1380,height:1000}}),page=await context.newPage(),errors=[],calls=[];page.on('pageerror',e=>errors.push(e.message));
  let rateLimited=false,staleDetail=false,recoveryQuota=false;
- await page.route('**/api/travel-agent/',async route=>{const body=route.request().postDataJSON();calls.push(body.action);return route.fulfill({json:body.action==='plan'?{plan}:{recommendations:[{taskId:'task-1',offerIds:['flight'],reason:'测试推荐'}]}});});
+ await page.route('**/api/travel-agent/',async route=>{const body=route.request().postDataJSON();calls.push(body.action);return route.fulfill({json:body.action==='draft'?{draft:{title:plan.title,summary:'fixture已有行程',days:plan.days,questions:[],assumptions:[],warnings:[],ready:true}}:body.action==='confirm-draft'?{plan}:{recommendations:[{taskId:'task-1',offerIds:['flight'],reason:'测试推荐'}]}});});
  await page.route('**/api/travel/query/',async route=>{
   const body=route.request().postDataJSON();calls.push(body.action);assert.ok(['search','detail'].includes(body.action),'never create orders');
   if(body.action==='detail'){
@@ -21,7 +21,7 @@ try{
   return route.fulfill({json:{data:{id:body.kind+'-search',source:'fixture',queriedAt:new Date().toISOString(),offers:[{id:body.kind,supplierId:body.kind+'-supplier',name:body.kind==='flight'?'fixture航班':'fixture酒店',price:300,priceUnit:'fixture报价',departureTime:'08:00',arrivalTime:'10:00',type:'直飞'}]}}});
  });
  await page.route('**/api/travel/cars/',route=>route.fulfill({json:{source:'unavailable',offers:[],notice:'fixture租车未授权'}}));
- await page.goto(base+'/agent/');await page.waitForLoadState('networkidle');await page.getByRole('button',{name:'交给 DeepSeek 安排'}).click();
+ await page.goto(base+'/agent/');await page.waitForLoadState('networkidle');await page.getByRole('tab',{name:/模式1/}).click();await page.getByRole('button',{name:'整理已有行程'}).click();await page.getByRole('button',{name:'确认此行程，开始查价'}).click();
  await page.getByText('候选已整理好，请选择你喜欢的方案',{exact:true}).waitFor({timeout:30000});
  assert.equal(await page.getByTestId('agent-task').count(),4);assert.equal(await page.getByTestId('agent-offer').count(),2);
  await page.getByRole('button',{name:'选择 fixture航班',exact:true}).click();await page.getByRole('dialog').waitFor();await page.getByRole('button',{name:'¥400 · 选这个',exact:true}).click();

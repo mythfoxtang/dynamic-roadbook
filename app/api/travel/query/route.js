@@ -1,11 +1,13 @@
 import { NextResponse } from "next/server";
+import {withQueryReport} from '@/lib/query-report.mjs';
 import { aiRequestBody } from "@/lib/ai-request";
 import { TRAVEL_COOKIE, getTravelAccount } from "@/lib/travel-vault.mjs";
 import { TravelError } from "@/lib/travel-core.mjs";
 import { travelEngine } from "@/lib/travel-engine.mjs";
 import { publicConnection } from "@/lib/travel-account.mjs";
 export const runtime = "nodejs";
-export async function POST(request) {
+export const POST=request=>withQueryReport(request,handlePost);
+async function handlePost(request) {
   try {
     const body = await aiRequestBody(request);
     const account = getTravelAccount(request.cookies.get(TRAVEL_COOKIE)?.value);

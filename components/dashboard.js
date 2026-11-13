@@ -805,10 +805,11 @@ export default function Dashboard() {
       });
 
       if (exists) return current;
-
+      const nextStops = [...baseStops, normalized];
+      saveDayPlans({ ...loadDayPlans(), [`stops:${dayId}`]: nextStops });
       return {
         ...current,
-        [dayId]: [...baseStops, normalized]
+        [dayId]: nextStops
       };
     });
   }, []);

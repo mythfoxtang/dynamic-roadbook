@@ -140,7 +140,7 @@ function RouteList({ segments }) {
         <div key={segment.id} className="rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm text-white/72">
           <div className="flex items-center justify-between gap-3">
             <span className="text-white/90">Day {segment.day}</span>
-            <span className={segment.transport === "flight" ? "text-sky-200" : "text-accent"}>{segment.transport === "flight" ? (segment.transportLabel || "航班") : `约 ${segment.distance.toLocaleString()} km`}</span>
+            <span className={segment.transport === "flight" ? "text-sky-200" : "text-accent"}>{segment.transport === "flight" ? (segment.transportLabel || "航班") : (segment.transport === "overview" ? "顺序示意" : `约 ${(segment.distance || 0).toLocaleString()} km`)}</span>
           </div>
           <div className="mt-2 truncate text-xs text-white/50">
             {segment.points.map((point) => point.name).join(" - ")}
@@ -151,7 +151,7 @@ function RouteList({ segments }) {
   );
 }
 
-function AmapRouteOverview({ route }) {
+export function AmapRouteOverview({ route }) {
   const mapRef = useRef(null);
   const mapInstanceRef = useRef(null);
   const overlaysRef = useRef([]);
@@ -182,7 +182,7 @@ function AmapRouteOverview({ route }) {
         if (disposed || !mapRef.current) return;
 
         const map = new AMap.Map(mapRef.current, {
-          viewMode: "3D",
+          viewMode: route.planning ? "2D" : "3D",
           mapStyle: "amap://styles/darkblue",
           zoom: 4.8,
           zooms: [4.4, 18],
@@ -238,6 +238,7 @@ function AmapRouteOverview({ route }) {
       const cachedPath = Array.isArray(cached?.path) ? cached.path.map(normalizePathPoint).filter(Boolean) : [];
       const fallbackPath = segment.points.map((point) => point.coord);
       const path = cachedPath.length > 1 && segment.transport !== "flight" ? cachedPath : fallbackPath;
+      if (path.length < 2 || path.every(p => p[0] === path[0][0] && p[1] === path[0][1])) return;
 
       const polyline = new AMap.Polyline({
         path,
@@ -269,7 +270,9 @@ function AmapRouteOverview({ route }) {
     });
 
     overlaysRef.current = overlays;
-    map.setFitView(overlays, false, [24, 28, 24, 28]);
+    const uniquePositions = new Set(nextRoute.points.map(p => p.coord.join(',')));
+    if (uniquePositions.size === 1) { map.setCenter(nextRoute.points[0].coord); map.setZoom(14); }
+    else if (overlays.length) map.setFitView(overlays, true, [24, 28, 24, 28], 15);
     if (map.getZoom?.() < 4.4) map.setZoom(4.4);
   }
 
@@ -298,7 +301,7 @@ function AmapRouteOverview({ route }) {
       ) : null}
       <div className="pointer-events-none absolute left-4 top-4 rounded-2xl border border-white/10 bg-black/35 px-4 py-3 text-xs text-white/72 backdrop-blur">
         <div className="font-medium text-white">高德全程路线总览</div>
-        <div className="mt-1">金色为已缓存导航线，绿色为坐标连线，蓝色虚线为航班切换。</div>
+        <div className="mt-1">{route.planning?'连线仅表示地点顺序，不代表导航路线。':'金色为已缓存导航线，绿色为坐标连线，蓝色虚线为航班切换。'}</div>
       </div>
     </div>
   );

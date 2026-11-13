@@ -1,5 +1,8 @@
 'use client';
 import Link from 'next/link';
+import QueryReports from './query-reports';
+import JourneyMap from './journey-map';
+import {reportedFetch} from '@/lib/query-report-client';
 import {useEffect,useRef,useState} from 'react';
 import {AGENT_EXAMPLE} from '@/lib/travel-agent-example';
 import styles from './journey-agent.module.css';
@@ -7,12 +10,14 @@ import {resolveAgentSelection} from '@/lib/travel-agent-selection.mjs';
 import {expandAgentTask,readWithRetry} from '@/lib/travel-agent-tools.mjs';
 import {filterTravelOffers} from '@/lib/travel-filters.mjs';
 import {checkTaskLocation,quarantineLocationResults} from '@/lib/travel-locations.mjs';
+import JourneyPlanner from './journey-planner';
+import {deferredRailwayTask} from '@/lib/travel-availability.mjs';
 const STORE='roadbook-deepseek-agent-v1';
 const names={flight:'机票',hotel:'住宿',train:'高铁／火车',car:'租车',attraction:'门票与预约'};
 const auditedPlan=p=>({...p,tasks:p.tasks.map(t=>({...t,locationConflict:checkTaskLocation(t)||undefined}))});
 const scope=q=>JSON.stringify([q?.kind,q?.city,q?.from,q?.to,q?.date,q?.startDate,q?.endDate,q?.adults,q?.children,q?.rooms,q?.pickupAt,q?.returnAt]);
 async function post(url,body,signal){
-  const response=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body),signal});
+  const response=await reportedFetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body),signal});
   const data=await response.json();
   if(!response.ok)throw Object.assign(new Error(data.error||'请求失败'),{status:response.status,code:data.code,retryAfter:data.retryAfter||Number(response.headers.get('Retry-After'))||0});
   return data;
@@ -21,6 +26,9 @@ function pause(ms,signal){return new Promise((resolve,reject)=>{const aborted=()
 const money=o=>o.price??o.totalAmount;
 export default function JourneyAgent(){
   const [input,setInput]=useState(AGENT_EXAMPLE),[plan,setPlan]=useState(null),[results,setResults]=useState({}),[choices,setChoices]=useState({}),[recommendations,setRecommendations]=useState([]),[status,setStatus]=useState('准备识别你的行程'),[error,setError]=useState(''),[busy,setBusy]=useState(false),[detail,setDetail]=useState(null),[detailBusy,setDetailBusy]=useState(false),[restored,setRestored]=useState(false);
+  const [mode,setMode]=useState('idea'),[showSetup,setShowSetup]=useState(true);
+  const [planningBusy,setPlanningBusy]=useState(false);
+  const bookingRef=useRef(null);
   const controller=useRef(null),started=useRef(false),detailController=useRef(null);
   const conversationLog=useRef(null);
   const [messages,setMessages]=useState([]),[preferences,setPreferences]=useState({}),[followup,setFollowup]=useState(''),[sources,setSources]=useState([]);
@@ -28,7 +36,8 @@ export default function JourneyAgent(){
   useEffect(()=>{if(conversationLog.current)conversationLog.current.scrollTop=conversationLog.current.scrollHeight;},[messages]);
   useEffect(()=>{
     if(started.current)return;started.current=true;
-    const restore=saved=>{const p=auditedPlan(saved.plan);setInput(p.input);setPlan(p);setResults(quarantineLocationResults(p,saved.results));setChoices(saved.choices||{});setRecommendations(saved.recommendations||[]);setMessages(saved.messages||[]);setPreferences(saved.preferences||{});setStatus('已恢复行程与选择，可以继续和 DeepSeek 商量');setRestored(true);};
+    try{const savedMode=localStorage.getItem('roadbook-agent-mode');if(['fixed','idea'].includes(savedMode))setMode(savedMode);}catch{}
+    const restore=saved=>{const p=auditedPlan(saved.plan);setInput(p.input);setPlan(p);setResults(quarantineLocationResults(p,saved.results));setChoices(saved.choices||{});setRecommendations(saved.recommendations||[]);setMessages(saved.messages||[]);setPreferences(saved.preferences||{});setStatus('已恢复行程与选择，可以继续和 DeepSeek 商量');setRestored(true);setShowSetup(false);};
     post('/api/travel-agent/',{action:'capabilities'}).then(data=>setSources(data.sources||[])).catch(()=>{});
     let local;try{local=JSON.parse(localStorage.getItem(STORE)||'null');if(local?.plan)restore(local);}catch{/* Storage unavailable does not prevent work. */}
     post('/api/travel-agent/',{action:'restore'}).then(data=>{setSources(data.sources||[]);if(data.state&&!controller.current&&!local?.unsynced)restore(data.state);}).catch(()=>{}).finally(()=>setHydrated(true));
@@ -43,6 +52,7 @@ export default function JourneyAgent(){
   },[plan,results,choices,recommendations,messages,preferences,busy,hydrated]);
   useEffect(()=>()=>{controller.current?.abort();detailController.current?.abort();},[]);
   async function searchOne(task,signal){
+    const deferred=deferredRailwayTask(task);if(deferred)return deferred;
     const conflict=checkTaskLocation(task);if(conflict)return {state:'blocked',offers:[],notice:conflict.message};
     if(task.kind==='attraction')return {state:'gap',offers:[],notice:'已识别预约需求；实时门票和预约货源尚未接入。'};
     const car=task.kind==='car';
@@ -91,6 +101,7 @@ export default function JourneyAgent(){
     const output={};
     for(const task of p.tasks){
       if(signal.aborted)return;
+      const deferred=deferredRailwayTask(task);if(deferred){output[task.id]=deferred;setResults({...output});continue;}
       setStatus(`正在为你查询：${task.title}`);
       const conflict=checkTaskLocation(task);if(conflict){output[task.id]={state:'blocked',offers:[],notice:conflict.message};setResults({...output});continue;}
       if(task.kind==='attraction'){output[task.id]={state:'gap',offers:[],notice:'已识别预约与门票需求；目前没有接入此景区实时门票或预约接口。'};setResults({...output});continue;}
@@ -120,6 +131,13 @@ export default function JourneyAgent(){
     catch(e){if(e.name!=='AbortError'){setError(e.message);setStatus('需要处理以下问题');}else setStatus('已停止；当前结果已保留');}
     finally{if(controller.current===abort)setBusy(false);}
   }
+  function switchMode(value){setMode(value);try{localStorage.setItem('roadbook-agent-mode',value);}catch{}}
+  async function confirmDraft(p){
+    setShowSetup(false);requestAnimationFrame(()=>bookingRef.current?.scrollIntoView({block:'start',behavior:'instant'}));
+    controller.current?.abort();detailController.current?.abort();const abort=new AbortController();controller.current=abort;
+    setBusy(true);setError('');setDetail(null);setInput(p.input);setPlan(p);setResults({});setChoices({});setRecommendations([]);setMessages([]);setPreferences({});setRestored(false);
+    try{await searchTasks(p,abort.signal);}catch(e){if(e.name!=='AbortError')setError(e.message);else setStatus('已停止；当前结果已保留');}finally{if(controller.current===abort)setBusy(false);}
+  }
   async function inspect(task,offer){
     const conflict=checkTaskLocation(task);if(conflict){setError(conflict.message);return;}
     if(task.kind==='car'){choose(task,offer);return;}
@@ -138,18 +156,29 @@ export default function JourneyAgent(){
   }
   const selected=Object.keys(choices).length;
   return <main className={styles.shell} data-has-plan={Boolean(plan)}><div className={styles.wrap}>
+    <QueryReports/>
     <nav className={styles.nav}><Link href="/">动态路书</Link><div><Link href="/travel/">单项查询</Link><Link href="/settings/ai/">AI 设置</Link></div></nav>
-    <header className={styles.hero}><div><p className={styles.eyebrow}>你的旅行，由智能体接着办</p><h1>行程确定了。<br/>边聊边选，随时调整。</h1><p>DeepSeek 理解你的安排，自动查询机票、住宿和租车，再帮你比较。</p></div><div className={styles.route}>{plan?plan.days.slice(0,6).map(day=><span key={day.date}>{day.date.slice(5)} · {day.city}</span>):<><span>告诉我行程</span><span>我来寻找候选</span><span>你来选择</span></>}</div></header>
-    <details className={styles.original} open={!plan}><summary>原始行程与重新分析</summary><form className={styles.input} onSubmit={e=>{e.preventDefault();run();}}><label htmlFor="agent-itinerary">把确定的行程交给 DeepSeek</label><textarea id="agent-itinerary" value={input} onChange={e=>setInput(e.target.value)} rows={4} maxLength={12000} disabled={busy}/><div><small>未说明的信息会列为查价假设，选择不会自动下单或扣款。</small><button disabled={busy||!input.trim()} type="submit">{busy?'智能体正在安排…':'交给 DeepSeek 安排'}</button></div></form></details>
+    <header className={styles.hero}><div><p className={styles.eyebrow}>从一个想法，到一趟旅行</p><h1>先聊想去哪。<br/>一起把行程定下来。</h1><p>DeepSeek 帮你规划每日路线、交通和住宿区域。你确认行程后，再查询预订候选。</p></div><div className={styles.route}>{plan?plan.days.slice(0,6).map(day=><span key={day.date}>{day.date.slice(5)} · {day.city}</span>):<><span>说说目的地与时间</span><span>商量并确认行程</span><span>查价与选择预订</span></>}</div></header>
+    <ol className={styles.steps} aria-label="旅行安排步骤"><li>1. 提供行程或想法</li><li aria-current={showSetup?'step':undefined}>2. 讨论并确认行程</li><li aria-current={!showSetup?'step':undefined}>3. 统一预订工作台</li></ol>
+    {plan&&<div className={styles.bookingGuide}><p>{showSetup?'修改后的行程确认前，原预订候选与选择会保留。确认新行程后重新查价。':'行程已确认，现在可以挑选交通和住宿，也可以继续提出预订偏好。'}</p><button disabled={busy||planningBusy} onClick={()=>setShowSetup(v=>!v)}>{showSetup?'返回当前预订工作台':'返回行程修改'}</button></div>}
+    <div hidden={!showSetup}>
+      <div className={styles.modeTabs} role="tablist" aria-label="选择行程模式">
+        <button role="tab" id="mode-fixed" aria-controls="panel-fixed" aria-selected={mode==='fixed'} disabled={busy||planningBusy} onClick={()=>switchMode('fixed')}>模式1：已有具体行程<span>整理安排，确认后预订</span></button>
+        <button role="tab" id="mode-idea" aria-controls="panel-idea" aria-selected={mode==='idea'} disabled={busy||planningBusy} onClick={()=>switchMode('idea')}>模式2：只有大概框架<span>先规划和修改，再确认预订</span></button>
+      </div>
+      <div role="tabpanel" id="panel-fixed" aria-labelledby="mode-fixed" hidden={mode!=='fixed'}><JourneyPlanner mode="fixed" initialInput={input} onConfirm={confirmDraft} onWorking={setPlanningBusy} disabled={busy}/></div>
+      <div role="tabpanel" id="panel-idea" aria-labelledby="mode-idea" hidden={mode!=='idea'}><JourneyPlanner mode="idea" onConfirm={confirmDraft} onWorking={setPlanningBusy} disabled={busy}/></div>
+    </div>
     <div className={styles.status} aria-live="polite"><span>{status}</span>{busy&&<button onClick={()=>controller.current?.abort()}>停止查询</button>}{plan&&!busy&&<button onClick={()=>run(true)}>重新核实全部候选</button>}</div>
     {error&&<p role="alert" className={styles.error}>{error} <Link href="/settings/ai/">打开 AI 设置</Link></p>}
-    {plan&&<>
+    {plan&&<section ref={bookingRef} hidden={showSetup} aria-label="统一预订工作台" className={styles.bookingWorkspace}><h2>统一预订工作台</h2>
+      {!showSetup&&<JourneyMap days={plan.days}/>}
       <section className={styles.dialogue} aria-label="与 DeepSeek 的对话"><div className={styles.dialogueHeader}><div><h2>继续和 DeepSeek 商量</h2><p>补充偏好、要求更多候选，或比较其他交通方式。已选内容会保留。</p></div><span>{Object.keys(choices).length} 项已选</span></div>
         {messages.length>0&&<div ref={conversationLog} className={styles.messages} role="log" aria-live="polite">{messages.map(message=><article key={message.id} className={message.role==='user'?styles.userMessage:styles.agentMessage}><b>{message.role==='user'?'你':'DeepSeek'}</b><p>{message.content}</p>{message.tools?.length>0&&<ul aria-label="本轮执行结果">{message.tools.map((tool,i)=><li key={i}>{tool}</li>)}</ul>}</article>)}</div>}
         <div className={styles.suggestions}>{['多给我一些酒店选项','查上海到宜昌的高铁备选','酒店300元以内，优先能停车','核实三峡之巅的地点并重查住宿'].map(value=><button key={value} disabled={busy} onClick={()=>sendMessage(value)}>{value}</button>)}</div>
         <form onSubmit={e=>{e.preventDefault();sendMessage();}} className={styles.composer}><label htmlFor="agent-followup">这轮想怎么调整？</label><textarea id="agent-followup" rows={2} maxLength={3000} value={followup} onChange={e=>setFollowup(e.target.value)} disabled={busy} placeholder="例如：北京酒店靠近地铁，再多找一些；恩施飞北京没结果，比较一下高铁"/><button type="submit" disabled={busy||!followup.trim()}>{busy?'正在处理…':'发给 DeepSeek'}</button></form>
       </section>
-      {sources.length>0&&<details className={styles.sources}><summary>查询能力与货源状态</summary><div>{sources.map(source=><p key={source.id}><b>{source.name}</b><span>{source.state==='configured'?'已配置':'待接入'}</span><small>{source.notice}</small></p>)}</div><p>候选来自当前已授权货源；未接入的平台不会被当作已搜索。</p></details>}
+      {sources.length>0&&<details className={styles.sources}><summary>查询能力与货源状态</summary><div>{sources.map(source=><p key={source.id}><b>{source.name}</b><span>{source.state==='configured'?'已配置':source.state==='sandbox'?'沙盒试订':'待接入'}</span><small>{source.notice}</small>{source.href&&<Link href={source.href}>打开独立入口</Link>}</p>)}</div><p>候选来自当前已授权货源；未接入的平台不会被当作已搜索。</p></details>}
       <section className={styles.overview}><div><h2>{plan.title}</h2><p>分析模型：{plan.analysis?.model} · {plan.days[0].date} 至 {plan.days.at(-1).date}</p></div><strong>已选 {selected} 项<span>共 {plan.tasks.length} 项需求</span></strong><ol>{plan.days.map(day=><li key={day.date}><time>{day.date.slice(5).replace('-','月')}日</time><b>{day.city}</b><span>{day.activity}</span></li>)}</ol></section>
       <details className={styles.notes} open><summary>查价假设与行程提醒</summary><ul>{[...plan.assumptions,...plan.warnings].map((v,i)=><li key={i}>{v}</li>)}</ul></details>
       <div className={styles.board}><section aria-label="预订候选" className={styles.tasks}>{plan.tasks.map(task=>{
@@ -166,7 +195,7 @@ export default function JourneyAgent(){
           {restored&&offers.length>0&&<p className={styles.muted}>这是上次快照，选择时自动读取最新详情。</p>}</>}
         </article>;
       })}</section><aside className={styles.selection} aria-label="我的选择"><h2>我的选择</h2><p>保存在当前浏览器。尚未预订。</p>{!selected&&<p className={styles.muted}>选好机票、房型和车型，它们会汇集在这里。</p>}{plan.tasks.filter(t=>choices[t.id]).map(t=><div key={t.id}><small>{t.title}</small><b>{choices[t.id].offer.name}</b><p>{choices[t.id].option?.name} {choices[t.id].option?.plan}</p>{t.kind==='hotel'&&<small>{t.query.startDate} → {t.query.endDate}</small>}<button onClick={()=>setChoices(c=>{const next={...c};delete next[t.id];return next;})}>移除</button></div>)}<p className={styles.muted}>不同报价口径不合并为总价。正式预订前仍需验价、旅客资料及你确认。</p></aside></div>
-    </>}
+    </section>}
     {detail&&<section className={styles.modal} role="dialog" aria-modal="true" aria-label="选择房型或舱位"><div><button autoFocus className={styles.close} onClick={()=>{detailController.current?.abort();setDetailBusy(false);setDetail(null);}}>关闭</button><h2>{detail.offer.name}</h2>{detailBusy&&<p aria-live="polite">{detail.waiting || "正在获取实际房型 / 舱位…"}</p>}{detail.error&&<p role="alert">{detail.error}，请重新核实候选。</p>}{detail.data&&<><p>选择具体房型或舱位，保存到「我的选择」。价格和库存以正式验价为准。</p>{(detail.data.options||[]).map(option=><div className={styles.option} key={option.id}><div><b>{option.name} {option.plan}</b><p>{option.bed} {option.meal} {option.baggage}</p><small>{option.refund||'退改规则待核实'} {option.priceUnit}</small></div><button onClick={()=>{choose(detail.task,detail.offer,option);setDetail(null);}}>{option.price==null?'价格待核实':`¥${option.price}`} · 选这个</button></div>)}{!detail.data.options?.length&&<p>没有返回可选房型或舱位，请选择其他候选。</p>}</>}</div></section>}
     <footer className={styles.footer}>智能体负责分析与推荐；价格与库存来自接入的供应商。缺少的货源会直接说明。</footer>
   </div></main>;

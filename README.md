@@ -92,3 +92,5 @@ NEXT_PUBLIC_AMAP_SECURITY_CODE=你的高德安全密钥
 - 分享方案说明：`SHARE_GUIDE.md`
 - 路线数据：`lib/roadtrip-data.js`
 - 地点信息：`lib/place-data.js`
+
+先规划再预订与网站测试部署：[本轮测试入口、接入调研和部署边界](docs/planning-and-hosting.md)。
